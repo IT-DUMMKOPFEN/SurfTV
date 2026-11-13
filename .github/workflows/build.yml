@@ -1,0 +1,121 @@
+name: Build SurfTV
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            target: windows
+          - name: Linux
+            os: ubuntu-latest
+            target: linux
+          - name: macOS
+            os: macos-latest
+            target: macos
+          - name: Android
+            os: ubuntu-latest
+            target: apk
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java (Android)
+        if: matrix.target == 'apk'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Linux packages
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev mpv clang cmake pkg-config
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create + patch platform folders
+        run: python3 tool/setup_platforms.py || python tool/setup_platforms.py
+        shell: bash
+
+      - name: Dependencies
+        run: flutter pub get
+
+      - name: App icon
+        run: dart run flutter_launcher_icons
+
+      - name: Build
+        run: flutter build ${{ matrix.target }} --release
+
+      - name: Package (Windows)
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath dist/SurfTV-windows-x64.zip
+
+      - name: Package (Linux)
+        if: matrix.target == 'linux'
+        run: |
+          mkdir -p dist
+          cp assets/icon/icon.png build/linux/x64/release/bundle/surftv.png
+          tar -czf dist/SurfTV-linux-x64.tar.gz -C build/linux/x64/release bundle --transform 's/^bundle/SurfTV/'
+
+      - name: Package (macOS)
+        if: matrix.target == 'macos'
+        run: |
+          mkdir -p dist
+          APP=$(ls -d build/macos/Build/Products/Release/*.app | head -n1)
+          ditto -c -k --sequesterRsrc --keepParent "$APP" dist/SurfTV-macos.zip
+
+      - name: Package (Android)
+        if: matrix.target == 'apk'
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk dist/SurfTV-android.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SurfTV-${{ matrix.name }}
+          path: dist/*
+
+  release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: SurfTV ${{ github.ref_name }}
+          body: |
+            SurfTV - free internet TV from all over the world.
+            Written by IT-Dummkopfen with the help of an AI.
+
+            Downloads:
+            - Windows: SurfTV-windows-x64.zip (unzip, start surftv.exe)
+            - macOS: SurfTV-macos.zip (unsigned: right-click > Open the first time)
+            - Linux: SurfTV-linux-x64.tar.gz (needs libmpv: sudo apt install libmpv2)
+            - Android: SurfTV-android.apk
+          files: dist/*

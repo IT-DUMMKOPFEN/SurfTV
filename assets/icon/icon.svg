@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1E3A8A"/>
+      <stop offset="1" stop-color="#0B1530"/>
+    </linearGradient>
+    <linearGradient id="case" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#D9480F"/>
+    </linearGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#BAE6FD"/>
+    </linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0EA5E9"/>
+      <stop offset="1" stop-color="#075985"/>
+    </linearGradient>
+    <linearGradient id="board" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FDE68A"/>
+    </linearGradient>
+    <clipPath id="screen">
+      <rect x="222" y="352" width="580" height="400" rx="56"/>
+    </clipPath>
+  </defs>
+
+  <!-- background tile -->
+  <rect x="0" y="0" width="1024" height="1024" rx="224" fill="url(#bg)"/>
+
+  <!-- antennas -->
+  <g stroke="#E5E7EB" stroke-width="22" stroke-linecap="round">
+    <line x1="512" y1="290" x2="380" y2="150"/>
+    <line x1="512" y1="290" x2="650" y2="130"/>
+  </g>
+  <circle cx="380" cy="150" r="24" fill="#E5E7EB"/>
+  <circle cx="650" cy="130" r="24" fill="#E5E7EB"/>
+  <circle cx="512" cy="292" r="30" fill="#9CA3AF"/>
+
+  <!-- TV body -->
+  <rect x="150" y="290" width="724" height="530" rx="96" fill="url(#case)"/>
+  <rect x="150" y="290" width="724" height="530" rx="96" fill="none" stroke="#7C2D12" stroke-opacity="0.35" stroke-width="8"/>
+
+  <!-- feet -->
+  <rect x="270" y="812" width="90" height="56" rx="20" fill="#7C2D12"/>
+  <rect x="664" y="812" width="90" height="56" rx="20" fill="#7C2D12"/>
+
+  <!-- screen -->
+  <rect x="210" y="340" width="604" height="424" rx="66" fill="#111827"/>
+  <g clip-path="url(#screen)">
+    <rect x="222" y="352" width="580" height="400" fill="url(#sky)"/>
+    <!-- sun -->
+    <circle cx="700" cy="440" r="48" fill="#FDE047"/>
+    <!-- back wave -->
+    <path d="M222 640 C 330 590, 420 610, 520 630 S 700 600, 802 620 L802 752 L222 752 Z" fill="#38BDF8" opacity="0.7"/>
+    <!-- big curling wave -->
+    <path d="M222 700
+             C 260 640, 300 560, 380 520
+             C 450 485, 540 500, 560 560
+             C 575 605, 530 625, 505 600
+             C 490 585, 500 560, 520 565
+             C 600 590, 700 660, 802 650
+             L 802 752 L 222 752 Z" fill="url(#sea)"/>
+    <!-- foam line -->
+    <path d="M380 520 C 450 485, 540 500, 560 560 C 575 605, 530 625, 505 600"
+          fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+    <path d="M560 640 C 640 668, 720 680, 802 668" fill="none" stroke="#E0F2FE" stroke-width="12" stroke-linecap="round" opacity="0.8"/>
+
+    <!-- surfboard gliding on the wave -->
+    <g transform="translate(640 628) rotate(-16)">
+      <ellipse cx="0" cy="0" rx="150" ry="30" fill="url(#board)" stroke="#0F172A" stroke-width="7"/>
+      <line x1="-130" y1="0" x2="138" y2="0" stroke="#EF4444" stroke-width="9" stroke-linecap="round"/>
+      <path d="M-120 26 L-100 58 L-82 28 Z" fill="#0F172A"/>
+    </g>
+    <!-- spray behind the board -->
+    <g fill="#FFFFFF">
+      <circle cx="486" cy="676" r="11"/>
+      <circle cx="462" cy="660" r="7"/>
+      <circle cx="470" cy="694" r="6"/>
+    </g>
+
+    <!-- screen glare -->
+    <path d="M232 372 L392 372 L272 520 L232 520 Z" fill="#FFFFFF" opacity="0.14"/>
+  </g>
+
+  <!-- knobs -->
+  <circle cx="512" cy="790" r="12" fill="#7C2D12" opacity="0.6"/>
+</svg>
