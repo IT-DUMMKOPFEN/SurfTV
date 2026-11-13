@@ -22,6 +22,7 @@ jobs:
       - run: python3 tool/build_default_list.py assets/channels_default.json
       - run: python3 tool/setup_platforms.py
       - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
       - run: flutter build apk --release
 
       - name: Enable KVM

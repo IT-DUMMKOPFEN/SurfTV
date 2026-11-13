@@ -14,6 +14,7 @@ class Channel {
     this.notAlways = false,
     this.vpnLikely = false,
     this.source = '',
+    this.categories = const [],
   });
 
   final String name;
@@ -37,6 +38,9 @@ class Channel {
   /// Which list the channel came from ("iptv-org" or "Free-TV").
   final String source;
 
+  /// iptv-org categories, e.g. "movies", "series", "documentary", "news".
+  final List<String> categories;
+
   /// True if you most likely need a VPN into [countryCode] to watch it.
   bool get needsVpn => geoBlocked || vpnLikely;
 
@@ -56,6 +60,7 @@ class Channel {
         notAlways: notAlways,
         vpnLikely: vpnLikely ?? this.vpnLikely,
         source: source,
+        categories: categories,
       );
 
   Map<String, dynamic> toJson() => {
@@ -69,6 +74,7 @@ class Channel {
         if (notAlways) 'na': true,
         if (vpnLikely) 'v': true,
         's': source,
+        if (categories.isNotEmpty) 'k': categories,
       };
 
   factory Channel.fromJson(Map<String, dynamic> j) => Channel(
@@ -82,6 +88,7 @@ class Channel {
         notAlways: j['na'] == true,
         vpnLikely: j['v'] == true,
         source: (j['s'] as String?) ?? '',
+        categories: (j['k'] as List?)?.cast<String>() ?? const [],
       );
 }
 

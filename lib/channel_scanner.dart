@@ -14,9 +14,33 @@ class Sources {
       'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8';
 }
 
+/// Categories SurfTV offers as filters (iptv-org category ids).
+const kCategories = ['movies', 'series', 'documentary', 'news'];
+
+/// How long streams may take to answer.
+enum TestMode {
+  /// Streams must answer quickly (about 3-4 seconds).
+  quick,
+
+  /// Streams get more time (up to about 15 seconds).
+  intensive,
+}
+
+class _Timing {
+  const _Timing(this.connect, this.response, this.data, this.parallel);
+  final Duration connect, response, data;
+  final int parallel;
+
+  static _Timing of(TestMode m) => m == TestMode.quick
+      ? const _Timing(Duration(seconds: 3), Duration(seconds: 4),
+          Duration(seconds: 3), 48)
+      : const _Timing(Duration(seconds: 10), Duration(seconds: 15),
+          Duration(seconds: 12), 24);
+}
+
 enum ScanPhase { downloading, checking, done }
 
-/// Snapshot of the running channel search, shown in the scan dialog.
+/// Snapshot of a running channel search / channel test.
 class ScanProgress {
   const ScanProgress({
     this.phase = ScanPhase.downloading,
@@ -32,31 +56,43 @@ class ScanProgress {
   final String message;
   final int total;
   final int checked;
+
+  /// Working channels so far.
   final int found;
   final int vpn;
 
-  /// The last channels found, newest first.
+  /// The last working channels, newest first.
   final List<Channel> recent;
+
+  /// Streams that did not answer.
+  int get dead => checked - found;
 }
 
 enum _Result { ok, vpn, dead }
 
-/// Downloads the public channel lists and tests every stream,
+/// Downloads the public channel lists and tests streams,
 /// like the channel search of a real TV.
 class ChannelScanner {
-  static const _concurrency = 32;
+  ChannelScanner({this.mode = TestMode.quick});
+
+  final TestMode mode;
+
   static const _defaultUserAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
-  /// Country code -> name, filled while downloading.
+  /// Country code -> name.
   final Map<String, String> countryNames = {};
 
   bool _cancelled = false;
   bool get cancelled => _cancelled;
 
-  /// Stops the search. Channels found so far are kept.
+  /// Stops the search / test. Results so far are kept.
   void cancel() => _cancelled = true;
+
+  // ===================================================================
+  // Update: download the newest lists and test them
+  // ===================================================================
 
   Future<ChannelDb> run(void Function(ScanProgress) onProgress) async {
     onProgress(const ScanProgress());
@@ -65,7 +101,7 @@ class ChannelScanner {
     final seenUrls = <String>{};
     var sourcesOk = 0;
 
-    // ---- 1. iptv-org (main source, has the geo-blocked label) ----
+    // ---- 1. iptv-org (main source, has geo-blocked label + categories) ----
     try {
       onProgress(const ScanProgress(message: 'Downloading iptv-org lists...'));
       final results = await Future.wait([
@@ -114,6 +150,10 @@ class ChannelScanner {
           // Channel ids look like "BBCOne.uk" - the suffix is the country.
           country = chId.split('.').last.split('@').first.toUpperCase();
         }
+        final cats = ((info?['categories'] as List?) ?? const [])
+            .whereType<String>()
+            .where(kCategories.contains)
+            .toList();
 
         candidates.add(Channel(
           name: name,
@@ -125,13 +165,14 @@ class ChannelScanner {
           geoBlocked: labels.any((l) => l.toLowerCase().contains('geo')),
           notAlways: labels.any((l) => l.contains('24/7')),
           source: 'iptv-org',
+          categories: cats,
         ));
       }
       sourcesOk++;
     } catch (_) {
       // Continue with the other source.
     }
-    if (_cancelled) return _empty(countryNames);
+    if (_cancelled) return _db([]);
 
     // ---- 2. Free-TV/IPTV (curated, smaller) ----
     try {
@@ -149,9 +190,57 @@ class ChannelScanner {
       throw Exception('Could not download any channel list. '
           'Please check your internet connection.');
     }
-    if (_cancelled) return _empty(countryNames);
+    if (_cancelled) return _db([]);
 
     // ---- 3. Test every stream ----
+    final found = await _testAll(candidates, onProgress, 'Searching channels');
+    return _db(found);
+  }
+
+  // ===================================================================
+  // Test: check the channels of the current list
+  // ===================================================================
+
+  /// Tests [channels]. Streams that do not answer are left out.
+  /// [keepUrls] are kept without testing (e.g. the channel you are watching).
+  /// If the test is stopped, untested channels are kept.
+  Future<ChannelDb> testExisting(
+    List<Channel> channels,
+    Map<String, String> names,
+    void Function(ScanProgress) onProgress, {
+    Set<String> keepUrls = const {},
+  }) async {
+    countryNames.addAll(names);
+    final tested = <String>{};
+    final found = await _testAll(channels, onProgress, 'Testing channels',
+        keepUrls: keepUrls, testedUrls: tested);
+    if (_cancelled) {
+      // Keep everything that was not tested yet.
+      final foundUrls = {for (final c in found) c.url};
+      for (final c in channels) {
+        if (!tested.contains(c.url) && !foundUrls.contains(c.url)) found.add(c);
+      }
+    }
+    return _db(found);
+  }
+
+  // ===================================================================
+
+  ChannelDb _db(List<Channel> channels) => ChannelDb(
+        channels: channels,
+        countryNames: Map.of(countryNames),
+        updated: DateTime.now(),
+      );
+
+  Future<List<Channel>> _testAll(
+    List<Channel> candidates,
+    void Function(ScanProgress) onProgress,
+    String label, {
+    Set<String> keepUrls = const {},
+    Set<String>? testedUrls,
+  }) async {
+    final timing = _Timing.of(mode);
+    final modeText = mode == TestMode.quick ? 'quick' : 'intensive';
     final found = <Channel>[];
     final recent = <Channel>[];
     var checked = 0;
@@ -159,23 +248,25 @@ class ChannelScanner {
     var next = 0;
     var lastEmit = DateTime.fromMillisecondsSinceEpoch(0);
 
+    ScanProgress snapshot(ScanPhase phase, String msg) => ScanProgress(
+          phase: phase,
+          message: msg,
+          total: candidates.length,
+          checked: checked,
+          found: found.length,
+          vpn: vpnCount,
+          recent: List.unmodifiable(recent),
+        );
+
     void emit({bool force = false}) {
       final now = DateTime.now();
-      if (!force && now.difference(lastEmit).inMilliseconds < 80) return;
+      if (!force && now.difference(lastEmit).inMilliseconds < 100) return;
       lastEmit = now;
-      onProgress(ScanProgress(
-        phase: ScanPhase.checking,
-        message: 'Searching channels...',
-        total: candidates.length,
-        checked: checked,
-        found: found.length,
-        vpn: vpnCount,
-        recent: List.unmodifiable(recent),
-      ));
+      onProgress(snapshot(ScanPhase.checking, '$label ($modeText test)...'));
     }
 
     final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 6)
+      ..connectionTimeout = timing.connect
       ..idleTimeout = const Duration(seconds: 2);
 
     Future<void> worker() async {
@@ -183,47 +274,33 @@ class ChannelScanner {
         final i = next++;
         if (i >= candidates.length) return;
         final c = candidates[i];
-        final r = await _check(client, c);
+        final r = keepUrls.contains(c.url)
+            ? (c.vpnLikely ? _Result.vpn : _Result.ok)
+            : await _check(client, c, timing);
         checked++;
+        testedUrls?.add(c.url);
         if (r != _Result.dead) {
-          final ch = r == _Result.vpn ? c.copyWith(vpnLikely: true) : c;
+          final ch = c.copyWith(vpnLikely: r == _Result.vpn);
           found.add(ch);
           if (ch.needsVpn) vpnCount++;
           recent.insert(0, ch);
           if (recent.length > 8) recent.removeLast();
-          emit(force: found.length % 25 == 1);
-        } else {
-          emit();
         }
+        emit();
       }
     }
 
     emit(force: true);
-    await Future.wait(List.generate(_concurrency, (_) => worker()));
+    await Future.wait(List.generate(timing.parallel, (_) => worker()));
     client.close(force: true);
 
-    onProgress(ScanProgress(
-      phase: ScanPhase.done,
-      message: _cancelled ? 'Search stopped.' : 'Search finished.',
-      total: candidates.length,
-      checked: checked,
-      found: found.length,
-      vpn: vpnCount,
-      recent: List.unmodifiable(recent),
-    ));
-
-    return ChannelDb(
-      channels: found,
-      countryNames: Map.of(countryNames),
-      updated: DateTime.now(),
-    );
+    onProgress(snapshot(ScanPhase.done,
+        _cancelled ? 'Stopped. Results so far are kept.' : 'Finished.'));
+    return found;
   }
 
-  ChannelDb _empty(Map<String, String> names) =>
-      ChannelDb(channels: [], countryNames: names, updated: DateTime.now());
-
-  /// Opens the stream and looks at the first bytes.
-  Future<_Result> _check(HttpClient client, Channel c) async {
+  /// Opens the stream and waits for the first bytes.
+  Future<_Result> _check(HttpClient client, Channel c, _Timing t) async {
     HttpClientRequest? req;
     try {
       final uri = Uri.parse(c.url);
@@ -231,13 +308,13 @@ class ChannelScanner {
         // rtmp/rtsp etc. cannot be tested with HTTP - let the player try.
         return _Result.ok;
       }
-      req = await client.getUrl(uri).timeout(const Duration(seconds: 6));
+      req = await client.getUrl(uri).timeout(t.connect);
       req.headers.set(HttpHeaders.userAgentHeader,
           (c.userAgent?.isNotEmpty ?? false) ? c.userAgent! : _defaultUserAgent);
       if (c.referrer?.isNotEmpty ?? false) {
         req.headers.set('Referer', c.referrer!);
       }
-      final res = await req.close().timeout(const Duration(seconds: 8));
+      final res = await req.close().timeout(t.response);
       final code = res.statusCode;
       if (code == 401 || code == 403 || code == 451) {
         unawaited(res.drain<void>().catchError((_) {}));
@@ -248,7 +325,7 @@ class ChannelScanner {
         return _Result.dead;
       }
       // Some data must arrive, otherwise the stream is dead.
-      final first = await res.first.timeout(const Duration(seconds: 6));
+      final first = await res.first.timeout(t.data);
       return first.isEmpty ? _Result.dead : _Result.ok;
     } catch (_) {
       req?.abort();

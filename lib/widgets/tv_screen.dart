@@ -76,7 +76,7 @@ class _TvScreenState extends State<TvScreen> {
                     fit: BoxFit.contain,
                     fill: Colors.black,
                   ),
-                  if (c == null) _noSignal(s),
+                  if (c == null || !s.firstFrameSeen) _startPicture(s),
                   if (c != null && s.buffering && s.playError == null)
                     const Center(
                         child: CircularProgressIndicator(color: Colors.white70)),
@@ -122,19 +122,33 @@ class _TvScreenState extends State<TvScreen> {
     );
   }
 
-  Widget _noSignal(AppState s) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.tv, size: 64, color: Colors.white38),
-          const SizedBox(height: 12),
-          Text(
-            s.channels.isEmpty
-                ? 'SurfTV\nPress "Update" on the remote to search for channels.'
-                : 'SurfTV\nPick a channel from the list or zap with the remote.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70, fontSize: 16),
+  /// Start picture (SurfTV logo, 16:9) until the first video picture.
+  Widget _startPicture(AppState s) => Stack(fit: StackFit.expand, children: [
+        Image.asset('assets/tv_background.jpg', fit: BoxFit.cover),
+        if (s.current == null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 10,
+            child: Center(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  s.channels.isEmpty
+                      ? 'Press "Update" on the remote to search for channels.'
+                      : 'Pick a channel from the list or zap with the remote.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ),
+            ),
           ),
-        ]),
-      );
+      ]);
 
   Widget _error(AppState s) {
     final c = s.current!;

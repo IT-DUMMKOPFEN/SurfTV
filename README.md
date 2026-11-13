@@ -1,4 +1,4 @@
-# SurfTV 0.1a
+# SurfTV 0.2b
 
 Watch free-to-air internet TV channels from all over the world.
 Windows · Linux · macOS · Android
@@ -31,7 +31,12 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
   - Day / night mode, fullscreen, **Update** (channel search)
 - Channel search: downloads the public lists and tests every stream, like the channel search on a TV. It shows a live counter with channel name and country. **Stop** keeps the channels found so far.
 - VPN hint: channels marked *geo-blocked* in the lists, or that answered "access denied" during the search
-- Filter "No VPN", search by channel or country
+- VPN filter: **All / No VPN / VPN only**
+- Categories: **Movies, Series, Docs, News** – all countries with their channels of that kind
+- **Test my channels** (Quick or Intensive): streams that do not answer are removed from the list. Runs in the background – TV keeps playing
+- **Update** keeps the current stream running
+- Ships with a channel list that was tested by GitHub Actions, so channels are there on the first start
+- Search by channel or country
 - Resizable window, fullscreen with button (bottom right), **F**, **F11** or double-click; leave with **Esc**
 
 ### Keyboard

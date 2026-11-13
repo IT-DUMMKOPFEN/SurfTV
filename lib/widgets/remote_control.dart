@@ -12,11 +12,13 @@ class RemoteControl extends StatelessWidget {
     super.key,
     required this.state,
     required this.onUpdate,
+    required this.onTest,
     required this.onAbout,
   });
 
   final AppState state;
   final VoidCallback onUpdate;
+  final VoidCallback onTest;
   final VoidCallback onAbout;
 
   @override
@@ -124,19 +126,37 @@ class RemoteControl extends StatelessWidget {
 
           Row(children: [
             Expanded(
-              child: FilledButton.icon(
-                onPressed: onUpdate,
-                icon: const Icon(Icons.radar),
-                label: const Text('Update'),
+              child: Tooltip(
+                message: 'Download and test the newest channel lists',
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  onPressed: onUpdate,
+                  icon: const Icon(Icons.radar, size: 18),
+                  label: const Text('Update'),
+                ),
               ),
             ),
             const SizedBox(width: 6),
-            IconButton(
-              tooltip: 'About SurfTV',
-              onPressed: onAbout,
-              icon: const Icon(Icons.info_outline),
+            Expanded(
+              child: Tooltip(
+                message: 'Test my channels, remove streams that do not answer',
+                child: FilledButton.tonalIcon(
+                  style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  onPressed: onTest,
+                  icon: const Icon(Icons.fact_check_outlined, size: 18),
+                  label: const Text('Test'),
+                ),
+              ),
             ),
           ]),
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: onAbout,
+            icon: const Icon(Icons.info_outline, size: 18),
+            label: const Text('About SurfTV'),
+          ),
         ]),
       ),
     );

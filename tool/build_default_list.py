@@ -19,6 +19,8 @@ import urllib.error
 import urllib.request
 
 API = "https://iptv-org.github.io/api"
+# Categories SurfTV shows as filters.
+CATS = {"movies", "series", "documentary", "news"}
 FREE_TV = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
@@ -62,6 +64,7 @@ def iptv_org(countries):
             "g": any("geo" in l.lower() for l in labels),
             "na": any("24/7" in l for l in labels),
             "s": "iptv-org",
+            "k": [k for k in ((ch or {}).get("categories") or []) if k in CATS],
         })
     return out
 
@@ -132,7 +135,7 @@ def main():
             if r != "dead":
                 if r == "vpn":
                     c["v"] = True
-                found.append({k: v for k, v in c.items() if v not in (None, False)})
+                found.append({k: v for k, v in c.items() if v not in (None, False, [])})
             if i % 1000 == 0:
                 print(f"checked {i}/{len(cands)}, found {len(found)}")
 

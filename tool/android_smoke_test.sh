@@ -18,6 +18,11 @@ sleep 25
 shot start
 adb shell wm size
 
+# Close the info window that opens at start.
+adb shell input keyevent 4
+sleep 3
+shot home
+
 # Press CH up on the remote control -> first channel plays.
 SIZE=$(adb shell wm size | grep -oE "[0-9]+x[0-9]+" | tail -n1)
 W=${SIZE%x*}; H=${SIZE#*x}

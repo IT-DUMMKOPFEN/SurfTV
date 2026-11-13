@@ -9,8 +9,15 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'channel_scanner.dart';
 import 'models.dart';
 import 'storage.dart';
+
+/// Channel list filter for geo-blocked channels.
+enum VpnFilter { all, noVpn, vpnOnly }
+
+/// What the background job does.
+enum JobKind { update, test }
 
 bool get isDesktop => Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
@@ -31,7 +38,10 @@ class AppState extends ChangeNotifier {
       }),
       player.stream.width.listen((w) {
         videoWidth = w;
-        if ((w ?? 0) > 0) playError = null;
+        if ((w ?? 0) > 0) {
+          playError = null;
+          firstFrameSeen = true;
+        }
         notifyListeners();
       }),
       player.stream.height.listen((h) {
@@ -48,7 +58,17 @@ class AppState extends ChangeNotifier {
 
   // ---- Channels ----
   List<Channel> channels = [];
+  /// Channels that pass the VPN + category filter (zapping uses this list).
+  List<Channel> visible = [];
+
+  /// [visible] grouped by country, for the channel list.
   List<CountryGroup> groups = [];
+
+  // ---- Filters ----
+  VpnFilter vpnFilter = VpnFilter.all;
+
+  /// null = all channels, otherwise one of [kCategories].
+  String? category;
   Map<String, String> countryNames = {};
   DateTime? listUpdated;
   final Map<String, int> _indexByUrl = {};
@@ -59,6 +79,19 @@ class AppState extends ChangeNotifier {
   String? playError;
   int? videoWidth;
   int? videoHeight;
+
+  /// False until the first video picture arrived (start picture is shown).
+  bool firstFrameSeen = false;
+
+  // ---- Background job (channel search / channel test) ----
+  ChannelScanner? _scanner;
+  JobKind? jobKind;
+  TestMode jobMode = TestMode.quick;
+  String? jobError;
+
+  /// Live progress of the job - listened to by the progress widgets only.
+  final ValueNotifier<ScanProgress?> jobProgress = ValueNotifier(null);
+  bool get jobRunning => _scanner != null;
 
   // ---- Settings ----
   double volume = 70;
@@ -118,6 +151,11 @@ class AppState extends ChangeNotifier {
           favorites[i] = list[i];
         }
       }
+      vpnFilter = VpnFilter.values.firstWhere(
+          (f) => f.name == p.getString('vpnFilter'),
+          orElse: () => VpnFilter.all);
+      final cat = p.getString('category');
+      category = kCategories.contains(cat) ? cat : null;
     } catch (e) {
       debugPrint('SurfTV: settings not loaded: $e');
     }
@@ -159,8 +197,19 @@ class AppState extends ChangeNotifier {
       ..clear()
       ..addAll({for (var i = 0; i < list.length; i++) list[i].url: i});
 
+    _rebuildVisible();
+  }
+
+  /// Applies the VPN + category filter.
+  void _rebuildVisible() {
+    visible = channels.where((c) {
+      if (vpnFilter == VpnFilter.noVpn && c.needsVpn) return false;
+      if (vpnFilter == VpnFilter.vpnOnly && !c.needsVpn) return false;
+      if (category != null && !c.categories.contains(category)) return false;
+      return true;
+    }).toList();
     final map = <String, List<Channel>>{};
-    for (final c in list) {
+    for (final c in visible) {
       map.putIfAbsent(c.countryCode, () => []).add(c);
     }
     groups = [
@@ -169,27 +218,95 @@ class AppState extends ChangeNotifier {
     ];
   }
 
-  /// Takes over the result of a channel search.
-  /// [merge] = true keeps the old channels (used when the search was stopped).
+  void setVpnFilter(VpnFilter f) {
+    vpnFilter = f;
+    _prefs?.setString('vpnFilter', f.name);
+    _rebuildVisible();
+    notifyListeners();
+  }
+
+  void setCategory(String? c) {
+    category = c;
+    if (c == null) {
+      _prefs?.remove('category');
+    } else {
+      _prefs?.setString('category', c);
+    }
+    _rebuildVisible();
+    notifyListeners();
+  }
+
+  /// Takes over a new channel list. The channel you are watching keeps
+  /// running, even if it is not in the new list.
+  /// [merge] = true keeps the old channels (used when a search was stopped).
   Future<void> applyScan(ChannelDb db, {bool merge = false}) async {
-    final playingUrl = current?.url;
-    ChannelDb result = db;
+    final playing = current;
+    var list = db.channels;
+    var names = db.countryNames;
     if (merge && channels.isNotEmpty) {
       final byUrl = {for (final c in channels) c.url: c};
       for (final c in db.channels) {
         byUrl[c.url] = c;
       }
-      result = ChannelDb(
-        channels: byUrl.values.toList(),
-        countryNames: {...countryNames, ...db.countryNames},
-        updated: db.updated,
-      );
+      list = byUrl.values.toList();
+      names = {...countryNames, ...db.countryNames};
     }
+    if (playing != null && !list.any((c) => c.url == playing.url)) {
+      list = [...list, playing];
+    }
+    final result =
+        ChannelDb(channels: list, countryNames: names, updated: db.updated);
     _setDb(result);
-    currentIndex = playingUrl == null ? -1 : indexOfUrl(playingUrl);
+    // Only the index changes - the player is not touched, so TV keeps running.
+    currentIndex = playing == null ? -1 : indexOfUrl(playing.url);
     notifyListeners();
     await Storage.saveDb(result);
   }
+
+  // ================= Channel search / test (runs in background) =================
+
+  /// Starts a channel search ([JobKind.update]) or a test of the current
+  /// list ([JobKind.test]). TV keeps playing meanwhile.
+  Future<void> startJob(JobKind kind, TestMode mode) async {
+    if (_scanner != null) return;
+    final scanner = ChannelScanner(mode: mode);
+    _scanner = scanner;
+    jobKind = kind;
+    jobMode = mode;
+    jobError = null;
+    jobProgress.value = const ScanProgress(message: 'Starting...');
+    notifyListeners();
+    try {
+      ChannelDb db;
+      if (kind == JobKind.update) {
+        db = await scanner.run((p) => jobProgress.value = p);
+        if (db.channels.isNotEmpty) {
+          await applyScan(db, merge: scanner.cancelled);
+        }
+      } else {
+        final playing = current;
+        final keep = <String>{
+          if (playing != null && (videoWidth ?? 0) > 0) playing.url,
+        };
+        db = await scanner.testExisting(
+            List.of(channels), countryNames, (p) => jobProgress.value = p,
+            keepUrls: keep);
+        await applyScan(db);
+      }
+    } catch (e) {
+      jobError = e.toString().replaceFirst('Exception: ', '');
+    }
+    _scanner = null;
+    notifyListeners();
+  }
+
+  /// Stops the running job. Results so far are kept.
+  void stopJob() {
+    _scanner?.cancel();
+    notifyListeners();
+  }
+
+  bool get jobStopping => _scanner?.cancelled ?? false;
 
   // ================= Playback =================
 
@@ -208,14 +325,23 @@ class AppState extends ChangeNotifier {
 
   Future<void> playChannel(Channel c) => play(indexOfUrl(c.url));
 
-  void nextChannel() {
-    if (channels.isEmpty) return;
-    play(currentIndex < 0 ? 0 : (currentIndex + 1) % channels.length);
-  }
+  /// Zapping follows the filtered list (VPN filter + category).
+  void nextChannel() => _zap(1);
 
-  void previousChannel() {
-    if (channels.isEmpty) return;
-    play(currentIndex <= 0 ? channels.length - 1 : currentIndex - 1);
+  void previousChannel() => _zap(-1);
+
+  void _zap(int step) {
+    final list = visible.isNotEmpty ? visible : channels;
+    if (list.isEmpty) return;
+    final url = current?.url;
+    var i = url == null ? -1 : list.indexWhere((c) => c.url == url);
+    if (i < 0) {
+      i = step > 0 ? 0 : list.length - 1;
+    } else {
+      i = (i + step) % list.length;
+      if (i < 0) i += list.length;
+    }
+    playChannel(list[i]);
   }
 
   // ================= Volume =================
@@ -280,6 +406,8 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _scanner?.cancel();
+    jobProgress.dispose();
     for (final s in _subs) {
       s.cancel();
     }

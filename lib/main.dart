@@ -12,7 +12,7 @@ import 'widgets/remote_control.dart';
 import 'widgets/scan_dialog.dart';
 import 'widgets/tv_screen.dart';
 
-const appVersion = '0.1a';
+const appVersion = '0.2b';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -155,8 +155,17 @@ class _HomePageState extends State<HomePage> {
     return b >= 0 ? b : null;
   }
 
-  void _update() async {
-    await showScanDialog(context, s);
+  @override
+  void initState() {
+    super.initState();
+    // Show the info window when the app starts.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _about();
+    });
+  }
+
+  Future<void> _job(JobKind kind) async {
+    await showJobStart(context, s, initial: kind);
     _focus.requestFocus();
   }
 
@@ -165,7 +174,7 @@ class _HomePageState extends State<HomePage> {
       context: context,
       applicationName: 'SurfTV',
       applicationVersion: appVersion,
-      applicationIcon: Image.asset('assets/icon/icon.png', width: 56, height: 56),
+      applicationIcon: Image.asset('assets/icon/icon.png', width: 72, height: 72),
       applicationLegalese:
           'Written by IT-Dummkopfen with the help of an AI.',
       children: const [
@@ -176,12 +185,19 @@ class _HomePageState extends State<HomePage> {
             'internet. The "VPN" hint means the broadcaster probably limits '
             'the stream to its own country.'),
       ],
-    );
+    ).then((_) {
+      if (mounted) _focus.requestFocus();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final remote = RemoteControl(state: s, onUpdate: _update, onAbout: _about);
+    final remote = RemoteControl(
+      state: s,
+      onUpdate: () => _job(JobKind.update),
+      onTest: () => _job(JobKind.test),
+      onAbout: _about,
+    );
 
     return Focus(
       focusNode: _focus,
