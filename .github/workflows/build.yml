@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -108,6 +110,7 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
           name: SurfTV ${{ github.ref_name }}
           body: |
             SurfTV - free internet TV from all over the world.
