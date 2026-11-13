@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 
 import 'models.dart';
@@ -19,6 +20,17 @@ class Storage {
       final f = await _file();
       if (!await f.exists()) return null;
       final text = await f.readAsString();
+      return await Isolate.run(
+          () => ChannelDb.fromJson(jsonDecode(text) as Map<String, dynamic>));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The channel list shipped with the app (built by GitHub Actions).
+  static Future<ChannelDb?> loadDefaultDb() async {
+    try {
+      final text = await rootBundle.loadString('assets/channels_default.json');
       return await Isolate.run(
           () => ChannelDb.fromJson(jsonDecode(text) as Map<String, dynamic>));
     } catch (_) {

@@ -16,8 +16,21 @@ env:
   APP_VERSION: '0.1a'
 
 jobs:
+  channels:
+    name: Channel list
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download + test all channels
+        run: python3 tool/build_default_list.py assets/channels_default.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: channel-list
+          path: assets/channels_default.json
+
   build:
     name: ${{ matrix.name }}
+    needs: channels
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -38,6 +51,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Shipped channel list
+        uses: actions/download-artifact@v4
+        with:
+          name: channel-list
+          path: assets
 
       - name: Java (Android)
         if: matrix.target == 'apk'

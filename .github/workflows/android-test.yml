@@ -19,6 +19,7 @@ jobs:
         with:
           channel: stable
           cache: true
+      - run: python3 tool/build_default_list.py assets/channels_default.json
       - run: python3 tool/setup_platforms.py
       - run: flutter pub get
       - run: flutter build apk --release

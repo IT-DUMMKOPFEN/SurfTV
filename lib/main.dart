@@ -33,8 +33,9 @@ Future<void> main() async {
   }
 
   final state = AppState();
-  await state.load();
+  // Show the window first, then load settings and channels.
   runApp(SurfTvApp(state: state));
+  state.load();
 }
 
 class SurfTvApp extends StatelessWidget {

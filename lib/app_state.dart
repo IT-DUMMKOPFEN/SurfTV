@@ -97,29 +97,52 @@ class AppState extends ChangeNotifier {
 
   // ================= Loading / saving =================
 
-  Future<void> load() async {
-    _prefs = await SharedPreferences.getInstance();
-    final p = _prefs!;
-    volume = p.getDouble('volume') ?? 70;
-    muted = p.getBool('muted') ?? false;
-    themeMode = (p.getString('theme') == 'light') ? ThemeMode.light : ThemeMode.dark;
-    final fav = p.getString('favorites');
-    if (fav != null) {
-      final list = (jsonDecode(fav) as List).cast<String?>();
-      for (var i = 0; i < 10 && i < list.length; i++) {
-        favorites[i] = list[i];
-      }
-    }
-    await player.setVolume(muted ? 0 : volume);
+  /// True until settings and the channel list are loaded.
+  bool loading = true;
 
-    final db = await Storage.loadDb();
-    if (db != null) {
-      _setDb(db);
-      final last = p.getString('lastChannel');
-      final i = last == null ? -1 : indexOfUrl(last);
-      if (i >= 0) play(i);
+  /// Loads settings and channels. Called AFTER runApp, so the window shows
+  /// up at once. Never await the player here: media_kit only finishes its
+  /// setup once the video widget is on screen.
+  Future<void> load() async {
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      final p = _prefs!;
+      volume = p.getDouble('volume') ?? 70;
+      muted = p.getBool('muted') ?? false;
+      themeMode =
+          (p.getString('theme') == 'light') ? ThemeMode.light : ThemeMode.dark;
+      final fav = p.getString('favorites');
+      if (fav != null) {
+        final list = (jsonDecode(fav) as List).cast<String?>();
+        for (var i = 0; i < 10 && i < list.length; i++) {
+          favorites[i] = list[i];
+        }
+      }
+    } catch (e) {
+      debugPrint('SurfTV: settings not loaded: $e');
     }
     notifyListeners();
+    unawaited(player.setVolume(muted ? 0 : volume));
+
+    // Saved list (from the last channel search) or the list shipped with
+    // the app - whichever is newer.
+    final saved = await Storage.loadDb();
+    final shipped = await Storage.loadDefaultDb();
+    ChannelDb? db = saved;
+    if (shipped != null &&
+        shipped.channels.isNotEmpty &&
+        (db == null ||
+            db.channels.isEmpty ||
+            shipped.updated.isAfter(db.updated))) {
+      db = shipped;
+    }
+    if (db != null) _setDb(db);
+    loading = false;
+    notifyListeners();
+
+    final last = _prefs?.getString('lastChannel');
+    final i = last == null ? -1 : indexOfUrl(last);
+    if (i >= 0) unawaited(play(i));
   }
 
   void _setDb(ChannelDb db) {

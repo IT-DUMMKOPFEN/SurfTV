@@ -28,6 +28,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon/icon.png
+    - assets/channels_default.json
 
 # App icon: a TV with a surfboard gliding on a wave.
 # Generate with:  dart run flutter_launcher_icons

@@ -133,7 +133,9 @@ class _ChannelListState extends State<ChannelList> {
         ),
         const Divider(height: 8),
         Expanded(
-          child: s.channels.isEmpty
+          child: s.loading
+              ? const Center(child: CircularProgressIndicator())
+              : s.channels.isEmpty
               ? const Center(
                   child: Padding(
                     padding: EdgeInsets.all(24),
