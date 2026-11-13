@@ -170,21 +170,24 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _about() {
-    showAboutDialog(
+    showDialog<void>(
       context: context,
-      applicationName: 'SurfTV',
-      applicationVersion: appVersion,
-      applicationIcon: Image.asset('assets/icon/icon.png', width: 72, height: 72),
-      applicationLegalese:
-          'Written by IT-Dummkopfen with the help of an AI.',
-      children: const [
-        SizedBox(height: 12),
-        Text('Channel lists: iptv-org (github.com/iptv-org/iptv) and '
-            'Free-TV (github.com/Free-TV/IPTV).\n'
-            'SurfTV only plays streams that are publicly available on the '
-            'internet. The "VPN" hint means the broadcaster probably limits '
-            'the stream to its own country.'),
-      ],
+      builder: (_) => AboutDialog(
+        applicationName: 'SurfTV',
+        applicationVersion: appVersion,
+        applicationIcon:
+            Image.asset('assets/icon/icon.png', width: 72, height: 72),
+        applicationLegalese:
+            'Written by IT-Dummkopfen with the help of an AI.',
+        children: const [
+          SizedBox(height: 12),
+          Text('Channel lists: iptv-org (github.com/iptv-org/iptv) and '
+              'Free-TV (github.com/Free-TV/IPTV).\n'
+              'SurfTV only plays streams that are publicly available on the '
+              'internet. The "VPN" hint means the broadcaster probably limits '
+              'the stream to its own country.'),
+        ],
+      ),
     ).then((_) {
       if (mounted) _focus.requestFocus();
     });
