@@ -129,7 +129,7 @@ class _TvScreenState extends State<TvScreen> {
           Text(
             s.channels.isEmpty
                 ? 'SurfTV\nPress "Update" on the remote to search for channels.'
-                : 'SurfTV\nPick a channel on the left or zap with the remote.',
+                : 'SurfTV\nPick a channel from the list or zap with the remote.',
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.white70, fontSize: 16),
           ),

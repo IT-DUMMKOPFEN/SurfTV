@@ -18,8 +18,15 @@ sleep 25
 shot start
 adb shell wm size
 
-# Open the channel list drawer (top-left button) and take a picture.
-adb shell input tap 70 170
+# Press CH up on the remote control -> first channel plays.
+SIZE=$(adb shell wm size | grep -oE "[0-9]+x[0-9]+" | tail -n1)
+W=${SIZE%x*}; H=${SIZE#*x}
+adb shell input tap $((W * 110 / 320)) $((H * 525 / 640))
+sleep 30
+shot playing
+
+# Open the channel list drawer (top-left button).
+adb shell input tap $((W * 28 / 320)) $((H * 52 / 640))
 sleep 4
 shot drawer
 
