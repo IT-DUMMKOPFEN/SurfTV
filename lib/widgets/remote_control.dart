@@ -47,11 +47,26 @@ class RemoteControl extends StatelessWidget {
       ),
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('SurfTV',
-              style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 2,
-                  color: dark ? Colors.white70 : Colors.black54)),
+          Row(children: [
+            Text('SurfTV',
+                style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                    color: dark ? Colors.white70 : Colors.black54)),
+            const Spacer(),
+            // Switch Classic <-> TV like (F1 on the keyboard).
+            Text('TV like',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: dark ? Colors.white70 : Colors.black54)),
+            Transform.scale(
+              scale: 0.8,
+              child: Switch(
+                value: s.uiMode == UiMode.tvLike,
+                onChanged: (_) => onSwitchUi(),
+              ),
+            ),
+          ]),
           const SizedBox(height: 10),
           _Display(state: s),
           const SizedBox(height: 14),
