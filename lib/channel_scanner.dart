@@ -109,6 +109,8 @@ class ChannelScanner {
         _getJson('${Sources.iptvOrgApi}/channels.json'),
         _getJson('${Sources.iptvOrgApi}/streams.json'),
         _getJson('${Sources.iptvOrgApi}/blocklist.json'),
+        _getJson('${Sources.iptvOrgApi}/logos.json')
+            .catchError((_) => <dynamic>[]),
       ]);
       for (final c in results[0] as List) {
         final m = c as Map<String, dynamic>;
@@ -118,6 +120,20 @@ class ChannelScanner {
       for (final c in results[1] as List) {
         final m = c as Map<String, dynamic>;
         channelInfo[m['id'] as String] = m;
+      }
+      // Channel logos - SVG cannot be shown, so they are skipped.
+      final logos = <String, String>{};
+      for (final l in results[4] as List) {
+        final m = l as Map<String, dynamic>;
+        final ch = m['channel'] as String?;
+        final url = m['url'] as String?;
+        if (ch == null || url == null) continue;
+        if ((m['format'] as String?)?.toUpperCase() == 'SVG' ||
+            url.toLowerCase().endsWith('.svg')) {
+          continue;
+        }
+        // Prefer the logo without feed (the main logo).
+        if (!logos.containsKey(ch) || m['feed'] == null) logos[ch] = url;
       }
       final blocked = <String>{
         for (final b in results[3] as List)
@@ -166,6 +182,7 @@ class ChannelScanner {
           notAlways: labels.any((l) => l.contains('24/7')),
           source: 'iptv-org',
           categories: cats,
+          logo: chId == null ? null : logos[chId],
         ));
       }
       sourcesOk++;

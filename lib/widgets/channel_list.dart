@@ -47,6 +47,43 @@ class _ChannelListState extends State<ChannelList> {
   final _searchCtrl = TextEditingController();
   String _search = '';
   String? _lastUrl;
+  final _ctrl = ScrollController();
+  static const _rowHeight = 40.0;
+
+  @override
+  void initState() {
+    super.initState();
+    final last = widget.state.lastCountry;
+    if (last != null) _expanded.add(last);
+    final cur = widget.state.current;
+    if (cur != null) {
+      _expanded.add(cur.countryCode);
+      _lastUrl = cur.url;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _center(false));
+  }
+
+  /// Moves the playing channel (or the last selected country) to the middle.
+  void _center(bool animate) {
+    if (!_ctrl.hasClients) return;
+    final rows = _rows;
+    final url = widget.state.current?.url;
+    var i = url == null ? -1 : rows.indexWhere((r) => r.channel?.url == url);
+    if (i < 0) {
+      final last = widget.state.lastCountry;
+      i = rows.indexWhere((r) => r.channel == null && r.group.code == last);
+    }
+    if (i < 0) return;
+    final pos = _ctrl.position;
+    final target = (i * _rowHeight + _rowHeight / 2 - pos.viewportDimension / 2)
+        .clamp(0.0, pos.maxScrollExtent);
+    if (animate) {
+      _ctrl.animateTo(target,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    } else {
+      _ctrl.jumpTo(target);
+    }
+  }
 
   // Cache, so the list is not rebuilt on every player event.
   List<CountryGroup>? _cachedGroups;
@@ -55,6 +92,7 @@ class _ChannelListState extends State<ChannelList> {
 
   @override
   void dispose() {
+    _ctrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -96,6 +134,7 @@ class _ChannelListState extends State<ChannelList> {
     if (cur != null && cur.url != _lastUrl) {
       _lastUrl = cur.url;
       _expanded.add(cur.countryCode);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _center(true));
     }
     final rows = _buildRows();
     final currentUrl = cur?.url;
@@ -214,6 +253,8 @@ class _ChannelListState extends State<ChannelList> {
                           ),
                         )
                       : ListView.builder(
+                          controller: _ctrl,
+                          itemExtent: _rowHeight,
                           itemCount: rows.length,
                           itemBuilder: (context, i) {
                             final r = rows[i];
@@ -233,7 +274,10 @@ class _ChannelListState extends State<ChannelList> {
     final open = _search.isNotEmpty || _expanded.contains(g.code);
     return InkWell(
       onTap: () => setState(() {
-        if (!_expanded.remove(g.code)) _expanded.add(g.code);
+        if (!_expanded.remove(g.code)) {
+          _expanded.add(g.code);
+          widget.state.setLastCountry(g.code);
+        }
       }),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

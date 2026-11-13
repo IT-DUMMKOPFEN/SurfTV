@@ -66,7 +66,8 @@ class _TvScreenState extends State<TvScreen> {
             onEnter: (_) => setState(() => _hover = true),
             onExit: (_) => setState(() => _hover = false),
             child: GestureDetector(
-              onDoubleTap: s.toggleFullscreen,
+              onDoubleTap: () =>
+                  s.videoOnly ? s.exitVideoOnly() : s.toggleFullscreen(),
               child: ClipRect(
                 child: Stack(fit: StackFit.expand, children: [
                   // BoxFit.contain keeps 4:3 pictures centered in the 16:9 area.
@@ -101,14 +102,16 @@ class _TvScreenState extends State<TvScreen> {
                         color: Colors.black54,
                         shape: const CircleBorder(),
                         child: IconButton(
-                          tooltip: s.fullscreen
-                              ? 'Exit fullscreen (Esc)'
+                          tooltip: s.videoOnly
+                              ? 'Back (Esc)'
                               : 'Fullscreen (F)',
                           color: Colors.white,
-                          icon: Icon(s.fullscreen
+                          icon: Icon(s.videoOnly
                               ? Icons.fullscreen_exit
                               : Icons.fullscreen),
-                          onPressed: s.toggleFullscreen,
+                          onPressed: () => s.videoOnly
+                              ? s.exitVideoOnly()
+                              : s.toggleFullscreen(),
                         ),
                       ),
                     ),

@@ -1,6 +1,8 @@
 // SurfTV - free internet TV from all over the world.
 // Written by IT-Dummkopfen with the help of an AI.
 
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
@@ -8,11 +10,12 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app_state.dart';
 import 'widgets/channel_list.dart';
+import 'widgets/dialogs.dart';
 import 'widgets/remote_control.dart';
 import 'widgets/scan_dialog.dart';
+import 'widgets/tv_like.dart';
 import 'widgets/tv_screen.dart';
 
-const appVersion = '0.2b';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +63,15 @@ class SurfTvApp extends StatelessWidget {
         theme: _theme(Brightness.light),
         darkTheme: _theme(Brightness.dark),
         themeMode: state.themeMode,
+        // Rows and lists can be swiped with the mouse too.
+        scrollBehavior: const MaterialScrollBehavior().copyWith(
+          dragDevices: {
+            PointerDeviceKind.touch,
+            PointerDeviceKind.mouse,
+            PointerDeviceKind.trackpad,
+            PointerDeviceKind.stylus,
+          },
+        ),
         home: HomePage(state: state),
       ),
     );
@@ -97,11 +109,15 @@ class _HomePageState extends State<HomePage> {
     final k = e.logicalKey;
 
     if (k == LogicalKeyboardKey.escape) {
-      if (s.fullscreen) {
-        s.setFullscreen(false);
+      if (s.videoOnly) {
+        s.exitVideoOnly();
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
+    }
+    if (k == LogicalKeyboardKey.f1) {
+      s.toggleUi();
+      return KeyEventResult.handled;
     }
     if (k == LogicalKeyboardKey.f11) {
       s.toggleFullscreen();
@@ -171,54 +187,7 @@ class _HomePageState extends State<HomePage> {
 
   /// Info window (also shown when the app starts).
   void _about() {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.asset('assets/icon/icon.png',
-                    width: 110, height: 110),
-              ),
-              const SizedBox(height: 12),
-              Text('SurfTV', style: Theme.of(ctx).textTheme.headlineSmall),
-              Text('Version $appVersion',
-                  style: Theme.of(ctx).textTheme.bodySmall),
-              const SizedBox(height: 10),
-              const Text('Written by IT-Dummkopfen with the help of an AI.',
-                  textAlign: TextAlign.center),
-              const SizedBox(height: 14),
-              const Text(
-                'Free internet TV from all over the world.\n\n'
-                'Channel lists: iptv-org (github.com/iptv-org/iptv) and '
-                'Free-TV (github.com/Free-TV/IPTV). SurfTV only plays streams '
-                'that are publicly available on the internet. The "VPN" hint '
-                'means the broadcaster probably limits the stream to its own '
-                'country.',
-                textAlign: TextAlign.center,
-              ),
-            ]),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => showLicensePage(
-              context: ctx,
-              applicationName: 'SurfTV',
-              applicationVersion: appVersion,
-            ),
-            child: const Text('Licenses'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    ).then((_) {
+    showInfo(context).then((_) {
       if (mounted) _focus.requestFocus();
     });
   }
@@ -230,6 +199,7 @@ class _HomePageState extends State<HomePage> {
       onUpdate: () => _job(JobKind.update),
       onTest: () => _job(JobKind.test),
       onAbout: _about,
+      onSwitchUi: s.toggleUi,
     );
 
     return Focus(
@@ -237,11 +207,21 @@ class _HomePageState extends State<HomePage> {
       autofocus: true,
       onKeyEvent: _onKey,
       child: LayoutBuilder(builder: (context, box) {
-        // ---- Fullscreen: only the picture ----
-        if (s.fullscreen) {
+        // ---- Fullscreen / Watch Live: only the picture ----
+        if (s.videoOnly) {
           return Scaffold(
             backgroundColor: Colors.black,
             body: TvScreen(state: s),
+          );
+        }
+
+        // ---- TV like interface ----
+        if (s.uiMode == UiMode.tvLike) {
+          return TvLikeScreen(
+            state: s,
+            remote: remote,
+            onUpdate: () => _job(JobKind.update),
+            onTest: () => _job(JobKind.test),
           );
         }
 

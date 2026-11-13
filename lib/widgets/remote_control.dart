@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
+import 'dialogs.dart';
 import 'flag.dart';
 
 /// Right panel: a symbolic TV remote control.
@@ -14,11 +15,13 @@ class RemoteControl extends StatelessWidget {
     required this.onUpdate,
     required this.onTest,
     required this.onAbout,
+    required this.onSwitchUi,
   });
 
   final AppState state;
   final VoidCallback onUpdate;
   final VoidCallback onTest;
+  final VoidCallback onSwitchUi;
   final VoidCallback onAbout;
 
   @override
@@ -152,11 +155,28 @@ class RemoteControl extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 4),
-          TextButton.icon(
-            onPressed: onAbout,
-            icon: const Icon(Icons.info_outline, size: 18),
-            label: const Text('About SurfTV'),
-          ),
+          Wrap(alignment: WrapAlignment.center, children: [
+            Tooltip(
+              message: 'Switch Classic / TV like (F1)',
+              child: TextButton.icon(
+                onPressed: onSwitchUi,
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: Text(state.uiMode == UiMode.tvLike
+                    ? 'Classic'
+                    : 'TV like'),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Help',
+              onPressed: () => showHelp(context),
+              icon: const Icon(Icons.help_outline, size: 20),
+            ),
+            IconButton(
+              tooltip: 'About SurfTV',
+              onPressed: onAbout,
+              icon: const Icon(Icons.info_outline, size: 20),
+            ),
+          ]),
         ]),
       ),
     );

@@ -13,7 +13,7 @@ permissions:
 
 env:
   # Version of the release that is created/updated from main.
-  APP_VERSION: '0.2b'
+  APP_VERSION: '0.3b'
 
 jobs:
   channels:

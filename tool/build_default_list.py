@@ -39,6 +39,18 @@ def iptv_org(countries):
         countries[c["code"].upper()] = c["name"]
     info = {c["id"]: c for c in json.loads(get(f"{API}/channels.json"))}
     blocked = {b["channel"] for b in json.loads(get(f"{API}/blocklist.json"))}
+    logos = {}
+    try:
+        for l in json.loads(get(f"{API}/logos.json")):
+            ch, url = l.get("channel"), l.get("url")
+            if not ch or not url:
+                continue
+            if (l.get("format") or "").upper() == "SVG" or url.lower().endswith(".svg"):
+                continue
+            if ch not in logos or l.get("feed") is None:
+                logos[ch] = url
+    except Exception as e:
+        print(f"logos failed: {e}")
     out = []
     for s in json.loads(get(f"{API}/streams.json")):
         url = (s.get("url") or "").strip()
@@ -65,6 +77,7 @@ def iptv_org(countries):
             "na": any("24/7" in l for l in labels),
             "s": "iptv-org",
             "k": [k for k in ((ch or {}).get("categories") or []) if k in CATS],
+            "l": logos.get(ch_id) if ch_id else None,
         })
     return out
 

@@ -16,6 +16,9 @@ import 'storage.dart';
 /// Channel list filter for geo-blocked channels.
 enum VpnFilter { all, noVpn, vpnOnly }
 
+/// The two user interfaces.
+enum UiMode { classic, tvLike }
+
 /// What the background job does.
 enum JobKind { update, test }
 
@@ -99,6 +102,23 @@ class AppState extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.dark;
   bool fullscreen = false;
 
+  /// Which user interface is shown (F1 / switch toggles).
+  UiMode uiMode = UiMode.classic;
+
+  /// "My Channels" - unlimited favorite list (channel URLs), separate from
+  /// the remote keys 0..9.
+  List<String> myChannels = [];
+
+  /// "Watch Live": the picture fills the app window (not the monitor).
+  bool watchLive = false;
+
+  /// Last selected country - shown again (centered) in both UIs.
+  String? lastCountry;
+
+  /// TV like: open tab and selected category.
+  int tvTab = 0;
+  String tvCategory = 'movies';
+
   /// Channel URLs stored on the remote keys 0..9.
   List<String?> favorites = List.filled(10, null);
 
@@ -154,6 +174,12 @@ class AppState extends ChangeNotifier {
       vpnFilter = VpnFilter.values.firstWhere(
           (f) => f.name == p.getString('vpnFilter'),
           orElse: () => VpnFilter.all);
+      uiMode = p.getString('ui') == 'tv' ? UiMode.tvLike : UiMode.classic;
+      myChannels = p.getStringList('myChannels') ?? [];
+      lastCountry = p.getString('lastCountry');
+      tvTab = p.getInt('tvTab') ?? 0;
+      final tc = p.getString('tvCategory');
+      if (kCategories.contains(tc)) tvCategory = tc!;
       final cat = p.getString('category');
       category = kCategories.contains(cat) ? cat : null;
     } catch (e) {
@@ -202,6 +228,13 @@ class AppState extends ChangeNotifier {
 
   /// Applies the VPN + category filter.
   void _rebuildVisible() {
+    visibleAll = channels.where((c) {
+      if (vpnFilter == VpnFilter.noVpn && c.needsVpn) return false;
+      if (vpnFilter == VpnFilter.vpnOnly && !c.needsVpn) return false;
+      return true;
+    }).toList();
+    _countryCache.clear();
+    _channelCache.clear();
     visible = channels.where((c) {
       if (vpnFilter == VpnFilter.noVpn && c.needsVpn) return false;
       if (vpnFilter == VpnFilter.vpnOnly && !c.needsVpn) return false;
@@ -319,6 +352,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     final c = channels[index];
     unawaited(_prefs?.setString('lastChannel', c.url));
+    lastCountry = c.countryCode;
+    unawaited(_prefs?.setString('lastCountry', c.countryCode));
     await player.open(Media(c.url, httpHeaders: c.httpHeaders));
     await player.setVolume(muted ? 0 : volume);
   }
@@ -380,6 +415,102 @@ class AppState extends ChangeNotifier {
     if (c == null) return false;
     playChannel(c);
     return true;
+  }
+
+  // ================= UI mode / My Channels / selection =================
+
+  void setUiMode(UiMode m) {
+    uiMode = m;
+    _prefs?.setString('ui', m == UiMode.tvLike ? 'tv' : 'classic');
+    notifyListeners();
+  }
+
+  void toggleUi() => setUiMode(
+      uiMode == UiMode.classic ? UiMode.tvLike : UiMode.classic);
+
+  bool isMyChannel(Channel c) => myChannels.contains(c.url);
+
+  void toggleMyChannel(Channel c) {
+    if (!myChannels.remove(c.url)) myChannels.add(c.url);
+    _prefs?.setStringList('myChannels', myChannels);
+    notifyListeners();
+  }
+
+  /// My Channels as channel objects (channels no longer in the list are skipped).
+  List<Channel> get myChannelList => [
+        for (final u in myChannels)
+          if (indexOfUrl(u) >= 0) channels[indexOfUrl(u)],
+      ];
+
+  void setLastCountry(String code) {
+    if (lastCountry == code) return;
+    lastCountry = code;
+    _prefs?.setString('lastCountry', code);
+    notifyListeners();
+  }
+
+  void setTvTab(int i) {
+    tvTab = i;
+    _prefs?.setInt('tvTab', i);
+    notifyListeners();
+  }
+
+  void setTvCategory(String c) {
+    tvCategory = c;
+    _prefs?.setString('tvCategory', c);
+    notifyListeners();
+  }
+
+  /// All channels of one country (unfiltered by category, VPN filter applied).
+  List<Channel> channelsOf(String country, {String? category}) =>
+      _channelCache.putIfAbsent(
+          '$country|${category ?? '*'}',
+          () => visibleAll
+              .where((c) =>
+                  c.countryCode == country &&
+                  (category == null || c.categories.contains(category)))
+              .toList());
+
+  final Map<String, List<Channel>> _channelCache = {};
+
+  /// Channels after the VPN filter only (TV like ignores the Classic
+  /// category filter and has its own Categories page).
+  List<Channel> visibleAll = [];
+  final Map<String, List<String>> _countryCache = {};
+
+  /// Countries (sorted by name) that have channels, optionally in [category].
+  List<String> countriesWith({String? category}) =>
+      _countryCache.putIfAbsent(category ?? '*', () => _countries(category));
+
+  List<String> _countries(String? category) {
+    final set = <String>{};
+    for (final c in visibleAll) {
+      if (category == null || c.categories.contains(category)) {
+        set.add(c.countryCode);
+      }
+    }
+    final list = set.toList()
+      ..sort((a, b) {
+        if (a == 'XX') return 1;
+        if (b == 'XX') return -1;
+        return countryName(a).compareTo(countryName(b));
+      });
+    return list;
+  }
+
+  /// True while only the picture is shown (fullscreen or Watch Live).
+  bool get videoOnly => fullscreen || watchLive;
+
+  void setWatchLive(bool v) {
+    watchLive = v;
+    notifyListeners();
+  }
+
+  /// Leaves fullscreen and Watch Live.
+  void exitVideoOnly() {
+    watchLive = false;
+    setFullscreen(false);
+    notifyListeners();
   }
 
   // ================= Theme / fullscreen =================

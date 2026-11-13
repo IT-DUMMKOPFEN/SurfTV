@@ -135,6 +135,36 @@ class _ProgressDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xEE0E1116),
+      alignment: Alignment.bottomCenter,
+      insetPadding: const EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: JobProgressPanel(
+            state: state,
+            onClose: () => Navigator.of(context).pop(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Live view of the running channel search / test (also used on the
+/// "Search" page of the TV like interface).
+class JobProgressPanel extends StatelessWidget {
+  const JobProgressPanel({super.key, required this.state, this.onClose});
+  final AppState state;
+
+  /// "Hide" / "Done" button. Not shown when null.
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: Listenable.merge([state, state.jobProgress]),
       builder: (context, _) {
@@ -146,17 +176,7 @@ class _ProgressDialog extends StatelessWidget {
         final modeText =
             state.jobMode == TestMode.quick ? 'Quick test' : 'Intensive test';
 
-        return Dialog(
-          backgroundColor: const Color(0xEE0E1116),
-          alignment: Alignment.bottomCenter,
-          insetPadding: const EdgeInsets.all(16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: DefaultTextStyle(
+        return DefaultTextStyle(
                 style: const TextStyle(color: Colors.white),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Row(children: [
@@ -266,15 +286,13 @@ class _ProgressDialog extends StatelessWidget {
                             : 'Stop (keep results)'),
                       ),
                     const Spacer(),
-                    FilledButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(running ? 'Hide' : 'Done'),
-                    ),
+                    if (onClose != null)
+                      FilledButton(
+                        onPressed: onClose,
+                        child: Text(running ? 'Hide' : 'Done'),
+                      ),
                   ]),
                 ]),
-              ),
-            ),
-          ),
         );
       },
     );
