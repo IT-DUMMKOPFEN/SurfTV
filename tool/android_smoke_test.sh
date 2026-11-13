@@ -17,6 +17,7 @@ adb shell am start -W -n $PKG/.MainActivity
 sleep 25
 adb shell input keyevent 4      # close info window
 sleep 3
+adb shell input keyevent 59     # dummy key (emulator drops the first key after BACK)
 shot classic_phone
 adb shell input keyevent 131    # F1 -> TV like
 sleep 4
@@ -31,6 +32,7 @@ adb shell am start -W -n $PKG/.MainActivity
 sleep 20
 adb shell input keyevent 4      # close info window
 sleep 3
+adb shell input keyevent 59     # dummy key
 shot tv_wide
 adb shell input keyevent 19     # arrow up -> first channel plays
 sleep 15
