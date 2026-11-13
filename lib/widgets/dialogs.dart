@@ -111,7 +111,7 @@ Future<void> showHelp(BuildContext context) {
               p('Search: update the channel list or test your channels.'),
               p('Discover: pick a country, then a channel.'),
               p('My Channels: your favorites. Remove with the x.'),
-              p('Categories: Movies, Series, Docs and News - pick a '
+              p('Categories: Movies, Series, Docu, News and Music - pick a '
                   'category, then a country, then a channel.'),
               p('Magnifier: search channels by name. Gear: settings. '
                   'Arrow on the left: channel list. Arrow on the right: '
@@ -125,10 +125,11 @@ Future<void> showHelp(BuildContext context) {
                   'geo-blocked. You need a VPN into the country of the '
                   'channel. Use the filter All / No VPN / VPN only.'),
               h('Update and Test'),
-              p('Update downloads the newest channel lists and tests every '
-                  'stream. Test checks the channels in your list and removes '
-                  'streams that do not answer. Quick: streams must answer '
-                  'fast. Intensive: streams get more time. Both run in the '
+              p('Update downloads the newest channel lists and builds the '
+                  'complete channel list again (all channels, not tested). '
+                  'Test checks the channels in your list and removes streams '
+                  'that do not answer. Quick: streams must answer fast. '
+                  'Intensive: streams get more time. Both run in the '
                   'background - you can keep watching TV.'),
               h('Keyboard'),
               key('F1', 'Switch Classic / TV like'),
@@ -221,7 +222,7 @@ Future<void> showSettings(
                 ListTile(
                   leading: const Icon(Icons.radar),
                   title: const Text('Update channel list'),
-                  subtitle: const Text('Download and test the newest lists'),
+                  subtitle: const Text('Read in the complete newest lists'),
                   onTap: () {
                     Navigator.of(ctx).pop();
                     onUpdate();

@@ -57,7 +57,7 @@ class _StartDialogState extends State<_StartDialog> {
               onChanged: (v) => setState(() => _kind = v!),
               title: const Text('Update channel list'),
               subtitle: const Text(
-                  'Download the newest lists from the internet and test every stream.'),
+                  'Download the newest lists and build the complete channel list again (all channels, not tested).'),
             ),
             RadioListTile<JobKind>(
               value: JobKind.test,
@@ -69,6 +69,7 @@ class _StartDialogState extends State<_StartDialog> {
               subtitle: const Text(
                   'Test the channels in your list. Streams that do not answer are removed.'),
             ),
+            if (_kind == JobKind.test) ...[
             const SizedBox(height: 12),
             Text('Test', style: theme.textTheme.titleSmall),
             const SizedBox(height: 6),
@@ -98,6 +99,12 @@ class _StartDialogState extends State<_StartDialog> {
                       'keeps slow but working channels.',
               style: theme.textTheme.bodySmall,
             ),
+            ] else ...[
+            const SizedBox(height: 12),
+            Text('After the update, use "Test my channels" to keep only '
+                'working channels.',
+                style: theme.textTheme.bodySmall),
+            ],
             const SizedBox(height: 10),
             Text('You can keep watching TV while this runs.',
                 style: theme.textTheme.bodySmall
@@ -186,8 +193,9 @@ class JobProgressPanel extends StatelessWidget {
                         style: const TextStyle(
                             fontSize: 20, fontWeight: FontWeight.bold)),
                     const Spacer(),
-                    Text(modeText,
-                        style: const TextStyle(color: Colors.white54)),
+                    if (isTest)
+                      Text(modeText,
+                          style: const TextStyle(color: Colors.white54)),
                   ]),
                   const SizedBox(height: 12),
                   Align(
@@ -222,9 +230,10 @@ class JobProgressPanel extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _counter('${p.found}', 'working', _lcd),
+                      _counter('${p.found}', isTest ? 'working' : 'channels', _lcd),
                       _counter('${p.vpn}', 'need VPN', const Color(0xFFFFB74D)),
-                      _counter('${p.dead}', 'removed', const Color(0xFFEF5350)),
+                      if (isTest)
+                        _counter('${p.dead}', 'removed', const Color(0xFFEF5350)),
                     ],
                   ),
                   const SizedBox(height: 12),

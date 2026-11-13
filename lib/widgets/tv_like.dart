@@ -350,13 +350,15 @@ Widget _pageLayout(List<Widget> header, Widget Function(bool shrink) grid) =>
 const _categoryNames = {
   'movies': 'Movies',
   'series': 'Series',
-  'documentary': 'Docs',
+  'documentary': 'Docu',
+  'music': 'Music',
   'news': 'News',
 };
 const _categoryIcons = {
   'movies': Icons.movie_outlined,
   'series': Icons.video_library_outlined,
   'documentary': Icons.public_outlined,
+  'music': Icons.music_note_outlined,
   'news': Icons.newspaper_outlined,
 };
 
@@ -690,14 +692,14 @@ class _SearchPageState extends State<_SearchPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(_mode == TestMode.quick
-                    ? 'Streams must answer within a few seconds.'
-                    : 'Streams get up to 15 seconds to answer.'),
+                    ? 'Test: streams must answer within a few seconds.'
+                    : 'Test: streams get up to 15 seconds to answer.'),
                 const SizedBox(height: 16),
                 Wrap(spacing: 16, runSpacing: 16, children: [
                   card(
                       Icons.radar,
                       'Update channel list',
-                      'Download the newest lists from the internet and test every stream.',
+                      'Download the newest lists and build the complete channel list again (all channels). Then test them.',
                       JobKind.update),
                   card(
                       Icons.fact_check_outlined,

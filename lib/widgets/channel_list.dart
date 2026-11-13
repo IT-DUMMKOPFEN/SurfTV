@@ -10,7 +10,8 @@ import 'scan_dialog.dart';
 const kCategoryLabels = {
   'movies': 'Movies',
   'series': 'Series',
-  'documentary': 'Docs',
+  'documentary': 'Docu',
+  'music': 'Music',
   'news': 'News',
 };
 
@@ -18,6 +19,7 @@ const kCategoryIcons = {
   'movies': Icons.movie_outlined,
   'series': Icons.video_library_outlined,
   'documentary': Icons.public_outlined,
+  'music': Icons.music_note_outlined,
   'news': Icons.newspaper_outlined,
 };
 

@@ -314,7 +314,8 @@ class AppState extends ChangeNotifier {
       if (kind == JobKind.update) {
         db = await scanner.run((p) => jobProgress.value = p);
         if (db.channels.isNotEmpty) {
-          await applyScan(db, merge: scanner.cancelled);
+          // The complete list replaces the old one.
+          await applyScan(db);
         }
       } else {
         final playing = current;

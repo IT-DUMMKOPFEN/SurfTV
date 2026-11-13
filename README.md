@@ -25,7 +25,7 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 ### Two interfaces – switch with **F1** (or the switch in the settings / on the remote)
 
 **TV like** – feels like a modern smart TV:
-- Top bar: Search (channel search), Discover (countries → channels), Live TV, My Channels (favorites), Categories (Movies, Series, Docs, News → countries → channels), volume – % +, fullscreen, name search (magnifier), settings (gear)
+- Top bar: Search (channel search), Discover (countries → channels), Live TV, My Channels (favorites), Categories (Movies, Series, Docu, News, Music → countries → channels), volume – % +, fullscreen, name search (magnifier), settings (gear)
 - Live TV: channel name, flag, **Watch Live** (picture fills the window) and **+ Favorite**, the running stream next to it; below: My Channels and the categories as swipeable rows
 - Channel tiles with logo (if available), name and flag – swipe with mouse or finger
 - Arrow left: channel list, arrow right: remote control
@@ -44,7 +44,8 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 - Channel search: downloads the public lists and tests every stream, like the channel search on a TV. It shows a live counter with channel name and country. **Stop** keeps the channels found so far.
 - VPN hint: channels marked *geo-blocked* in the lists, or that answered "access denied" during the search
 - VPN filter: **All / No VPN / VPN only**
-- Categories: **Movies, Series, Docs, News** – all countries with their channels of that kind
+- Categories: **Movies, Series, Docu, News, Music** – all countries with their channels of that kind
+- **Update** reads in the complete newest channel lists (all channels); **Test** then keeps only the working ones
 - **Test my channels** (Quick or Intensive): streams that do not answer are removed from the list. Runs in the background – TV keeps playing
 - **Update** keeps the current stream running
 - Ships with a channel list that was tested by GitHub Actions, so channels are there on the first start

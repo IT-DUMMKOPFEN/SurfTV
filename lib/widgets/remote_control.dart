@@ -145,7 +145,7 @@ class RemoteControl extends StatelessWidget {
           Row(children: [
             Expanded(
               child: Tooltip(
-                message: 'Download and test the newest channel lists',
+                message: 'Read in the complete newest channel lists',
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8)),

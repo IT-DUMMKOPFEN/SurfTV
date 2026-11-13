@@ -15,7 +15,7 @@ class Sources {
 }
 
 /// Categories SurfTV offers as filters (iptv-org category ids).
-const kCategories = ['movies', 'series', 'documentary', 'news'];
+const kCategories = ['movies', 'series', 'documentary', 'news', 'music'];
 
 /// How long streams may take to answer.
 enum TestMode {
@@ -209,9 +209,41 @@ class ChannelScanner {
     }
     if (_cancelled) return _db([]);
 
-    // ---- 3. Test every stream ----
-    final found = await _testAll(candidates, onProgress, 'Searching channels');
-    return _db(found);
+    // ---- 3. Read in the complete list (no test - use "Test" afterwards) ----
+    // Counted up in steps, like the channel search of a TV.
+    final recent = <Channel>[];
+    var vpn = 0;
+    const step = 250;
+    for (var i = 0; i < candidates.length; i += step) {
+      final end = (i + step).clamp(0, candidates.length);
+      for (var j = i; j < end; j++) {
+        if (candidates[j].needsVpn) vpn++;
+      }
+      recent
+        ..clear()
+        ..addAll(candidates.sublist((end - 8).clamp(0, end), end).reversed);
+      onProgress(ScanProgress(
+        phase: ScanPhase.checking,
+        message: 'Reading in all channels...',
+        total: candidates.length,
+        checked: end,
+        found: end,
+        vpn: vpn,
+        recent: List.unmodifiable(recent),
+      ));
+      await Future<void>.delayed(const Duration(milliseconds: 15));
+    }
+    onProgress(ScanProgress(
+      phase: ScanPhase.done,
+      message: 'Complete list read in: ${candidates.length} channels. '
+          'Use "Test" to keep only working channels.',
+      total: candidates.length,
+      checked: candidates.length,
+      found: candidates.length,
+      vpn: vpn,
+      recent: List.unmodifiable(recent),
+    ));
+    return _db(candidates);
   }
 
   // ===================================================================

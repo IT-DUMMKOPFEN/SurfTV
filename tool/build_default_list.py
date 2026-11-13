@@ -20,7 +20,7 @@ import urllib.request
 
 API = "https://iptv-org.github.io/api"
 # Categories SurfTV shows as filters.
-CATS = {"movies", "series", "documentary", "news"}
+CATS = {"movies", "series", "documentary", "news", "music"}
 FREE_TV = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
