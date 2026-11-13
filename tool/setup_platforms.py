@@ -59,10 +59,14 @@ def android_manifest(t):
 
 
 def mac_entitlements(t):
-    if "com.apple.security.network.client" in t:
-        return t
-    return t.replace("</dict>",
-                     "\t<key>com.apple.security.network.client</key>\n\t<true/>\n</dict>", 1)
+    if "com.apple.security.network.client" not in t:
+        t = t.replace("</dict>",
+                      "\t<key>com.apple.security.network.client</key>\n\t<true/>\n</dict>", 1)
+    # Export / import of favorites (file dialogs).
+    if "com.apple.security.files.user-selected.read-write" not in t:
+        t = t.replace("</dict>",
+                      "\t<key>com.apple.security.files.user-selected.read-write</key>\n\t<true/>\n</dict>", 1)
+    return t
 
 
 def title(t):

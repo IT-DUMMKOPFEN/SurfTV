@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../models.dart';
+import 'epg_view.dart';
 import 'flag.dart';
 
-const appVersion = '0.5b';
+const appVersion = '0.6b';
 
 /// Info window (also shown when the app starts).
 /// [onUpdate] shows an "Update channel list" link at the bottom left.
@@ -129,7 +130,12 @@ Future<void> showHelp(BuildContext context) {
                   'stream address are removed automatically (clean up). '
                   'Channels in My Channels and on the keys 0-9 always stay.'),
               p('Discover: pick a country, then a channel.'),
-              p('My Channels: your favorites. Remove with the x.'),
+              p('My Channels: your favorites. Remove with the x. Switch to '
+                  '"Program guide" to see what is on - the guide is loaded '
+                  'for the channels in My Channels only (source: epgshare01, '
+                  'not available for every channel). Export / Import saves '
+                  'your favorites to a file and loads them again, e.g. on '
+                  'another device.'),
               p('Categories: Movies, Series, Docu, News and Music - pick a '
                   'category, then a country, then a channel.'),
               p('Magnifier: search channels by name. Gear: settings. '
@@ -157,6 +163,7 @@ Future<void> showHelp(BuildContext context) {
               key('Up / Down', 'Next / previous channel'),
               key('+ / -', 'Volume'),
               key('M', 'Mute'),
+              key('G', 'Program guide'),
               key('0 - 9', 'Stored channel'),
               key('Double-click', 'Picture: fullscreen on / off'),
             ],
@@ -255,6 +262,27 @@ Future<void> showSettings(
                     Navigator.of(ctx).pop();
                     onTest();
                   },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.event_note),
+                  title: const Text('Program guide (My Channels)'),
+                  subtitle: Text(state.epgLoading
+                      ? (state.epgStatus ?? 'Loading...')
+                      : '${state.epg.length} channels with guide data'),
+                  onTap: () => showGuide(ctx, state),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.file_upload_outlined),
+                  title: const Text('Export favorites'),
+                  subtitle: const Text('My Channels and keys 0-9 to a file'),
+                  onTap: () => exportFavoritesFile(ctx, state),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.file_download_outlined),
+                  title: const Text('Import favorites'),
+                  subtitle: const Text('Add favorites from a file'),
+                  onTap: () => importFavoritesFile(ctx, state),
                 ),
                 const Divider(),
                 ListTile(

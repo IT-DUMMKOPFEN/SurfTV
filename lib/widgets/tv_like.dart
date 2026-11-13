@@ -5,6 +5,7 @@ import '../channel_scanner.dart';
 import '../models.dart';
 import 'channel_list.dart';
 import 'dialogs.dart';
+import 'epg_view.dart';
 import 'flag.dart';
 import 'scan_dialog.dart';
 import 'tiles.dart';
@@ -480,6 +481,8 @@ class _Hero extends StatelessWidget {
     final s = state;
     final c = s.current;
     final scheme = Theme.of(context).colorScheme;
+    final now = c == null ? null : s.nowOn(c);
+    final next = c == null ? null : s.nextOn(c);
 
     final info = Padding(
       padding: const EdgeInsets.fromLTRB(36, 24, 24, 24),
@@ -507,16 +510,46 @@ class _Hero extends StatelessWidget {
             style: Theme.of(context).textTheme.displaySmall?.copyWith(
                 fontWeight: FontWeight.w900, height: 1.05),
           ),
+          if (now != null) ...[
+            const SizedBox(height: 8),
+            Text(now.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w600)),
+            Text('${hm(now.start)} – ${hm(now.stop)}',
+                style: Theme.of(context).textTheme.bodyMedium),
+          ],
           const SizedBox(height: 12),
-          Container(
-            height: 4,
+          // Progress of the programme running now (or just a line).
+          SizedBox(
             width: 320,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(2),
-              gradient: const LinearGradient(
-                  colors: [kAccent, Color(0x332E8BEA)]),
-            ),
+            child: now != null
+                ? LinearProgressIndicator(
+                    value: now.progress(DateTime.now()),
+                    minHeight: 4,
+                    color: kAccent,
+                    borderRadius: BorderRadius.circular(2),
+                  )
+                : Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(2),
+                      gradient: const LinearGradient(
+                          colors: [kAccent, Color(0x332E8BEA)]),
+                    ),
+                  ),
           ),
+          if (next != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('Next ${hm(next.start)}  ${next.title}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium),
+            ),
           const SizedBox(height: 14),
           if (c != null)
             Wrap(
@@ -812,15 +845,59 @@ class _MyChannelsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = state;
     final my = s.myChannelList;
+
+    final toolbar = Padding(
+      padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(
+                  value: false,
+                  icon: Icon(Icons.grid_view),
+                  label: Text('Channels')),
+              ButtonSegment(
+                  value: true,
+                  icon: Icon(Icons.event_note),
+                  label: Text('Program guide')),
+            ],
+            selected: {s.myGuide},
+            onSelectionChanged: (v) => s.setMyGuide(v.first),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => importFavoritesFile(context, s),
+            icon: const Icon(Icons.file_download_outlined),
+            label: const Text('Import'),
+          ),
+          OutlinedButton.icon(
+            onPressed: my.isEmpty ? null : () => exportFavoritesFile(context, s),
+            icon: const Icon(Icons.file_upload_outlined),
+            label: const Text('Export'),
+          ),
+        ],
+      ),
+    );
+
     if (my.isEmpty) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _title(context, 'My Channels', sub: '0'),
+        toolbar,
         _hint(context,
             'No favorites yet. Watch a channel and press "+ Favorite" on Live TV.'),
       ]);
     }
+    if (s.myGuide) {
+      return _pageLayout([
+        _title(context, 'My Channels', sub: '${my.length}'),
+        toolbar,
+      ], (shrink) => EpgGuide(state: s, shrink: shrink));
+    }
     return _pageLayout([
       _title(context, 'My Channels', sub: '${my.length}'),
+      toolbar,
     ], (shrink) => TileGrid(
           shrink: shrink,
           itemCount: my.length,

@@ -16,6 +16,7 @@ class Channel {
     this.source = '',
     this.categories = const [],
     this.logo,
+    this.channelId,
   });
 
   final String name;
@@ -45,6 +46,9 @@ class Channel {
   /// Channel logo URL (iptv-org), if known.
   final String? logo;
 
+  /// Channel id (iptv-org id like "DasErste.de" or tvg-id), used for the EPG.
+  final String? channelId;
+
   /// True if you most likely need a VPN into [countryCode] to watch it.
   bool get needsVpn => geoBlocked || vpnLikely;
 
@@ -66,6 +70,7 @@ class Channel {
         source: source,
         categories: categories,
         logo: logo,
+        channelId: channelId,
       );
 
   /// Keeps this channel, but takes over logo, categories and flags of a
@@ -83,6 +88,7 @@ class Channel {
         source: source,
         categories: {...categories, ...o.categories}.toList(),
         logo: logo ?? o.logo,
+        channelId: channelId ?? o.channelId,
       );
 
   Map<String, dynamic> toJson() => {
@@ -98,6 +104,7 @@ class Channel {
         's': source,
         if (categories.isNotEmpty) 'k': categories,
         if (logo != null) 'l': logo,
+        if (channelId != null) 'i': channelId,
       };
 
   factory Channel.fromJson(Map<String, dynamic> j) => Channel(
@@ -113,6 +120,7 @@ class Channel {
         source: (j['s'] as String?) ?? '',
         categories: (j['k'] as List?)?.cast<String>() ?? const [],
         logo: j['l'] as String?,
+        channelId: j['i'] as String?,
       );
 }
 

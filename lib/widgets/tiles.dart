@@ -96,6 +96,15 @@ class _ChannelTileState extends State<ChannelTile> {
                         fontSize: (logo == null || _logoFailed) ? 17 : 13,
                       ),
                     ),
+                    // Programme running now (program guide, My Channels).
+                    if (s.nowOn(c) != null)
+                      Text(
+                        '▶ ${s.nowOn(c)!.title}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 11, color: kAccent),
+                      ),
                   ]),
                 ),
               ),

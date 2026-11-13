@@ -79,6 +79,7 @@ def iptv_org(countries):
             "s": "iptv-org",
             "k": [k for k in ((ch or {}).get("categories") or []) if k in CATS],
             "l": logos.get(ch_id) if ch_id else None,
+            "i": ch_id,
         })
     return out
 
@@ -107,6 +108,7 @@ def free_tv():
         name = re.sub("[ⓎⓉⒹⓈⒼ]", "", name).strip() or attr(inf, "tvg-name") or "Unknown"
         country = (attr(inf, "tvg-country") or "").upper()
         out.append({"n": name, "c": country if len(country) == 2 else "XX", "u": url,
+                    "i": attr(inf, "tvg-id"),
                     "q": "SD" if sd else None, "g": geo, "s": "Free-TV"})
     return out
 

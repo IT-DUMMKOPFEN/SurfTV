@@ -1,4 +1,4 @@
-# SurfTV 0.5b
+# SurfTV 0.6b
 
 Watch free-to-air internet TV channels from all over the world.
 Windows · Linux · macOS · Android
@@ -31,6 +31,8 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 - Arrow left: channel list, arrow right: remote control
 - The last selection is always shown in the middle again
 - Settings, English help and info page
+- **Program guide** for the channels in My Channels (now / next on Live TV, tiles, remote display; full guide on the My Channels page or with **G**). Source: [epgshare01](https://epgshare01.online/epgshare01/) – not every channel has guide data
+- **Export / Import** of My Channels and the keys 0–9 as a JSON file
 
 **Classic** – the original layout:
 

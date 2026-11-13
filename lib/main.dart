@@ -12,6 +12,7 @@ import 'app_state.dart';
 import 'channel_scanner.dart';
 import 'widgets/channel_list.dart';
 import 'widgets/dialogs.dart';
+import 'widgets/epg_view.dart';
 import 'widgets/remote_control.dart';
 import 'widgets/scan_dialog.dart';
 import 'widgets/tv_like.dart';
@@ -146,6 +147,8 @@ class _HomePageState extends State<HomePage> {
       s.previousChannel();
     } else if (k == LogicalKeyboardKey.keyM) {
       s.toggleMute();
+    } else if (k == LogicalKeyboardKey.keyG) {
+      showGuide(context, s);
     } else if (k == LogicalKeyboardKey.add ||
         k == LogicalKeyboardKey.numpadAdd ||
         k == LogicalKeyboardKey.equal) {
@@ -220,6 +223,9 @@ class _HomePageState extends State<HomePage> {
       onTest: () => _job(JobKind.test),
       onAbout: _about,
       onSwitchUi: s.toggleUi,
+      onSettings: () => showSettings(context, s,
+          onUpdate: () => _job(JobKind.update),
+          onTest: () => _job(JobKind.test)),
     );
 
     return Focus(

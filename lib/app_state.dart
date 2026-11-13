@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'channel_scanner.dart';
+import 'epg.dart';
 import 'models.dart';
 import 'storage.dart';
 
@@ -119,6 +120,22 @@ class AppState extends ChangeNotifier {
   int tvTab = 0;
   String tvCategory = 'movies';
 
+  /// TV like, My Channels: show the program guide instead of the tiles.
+  bool myGuide = false;
+
+  void setMyGuide(bool v) {
+    myGuide = v;
+    notifyListeners();
+  }
+
+  // ---- Program guide (EPG) for My Channels ----
+  Map<String, List<Programme>> epg = {};
+  DateTime? epgFetched;
+  bool epgLoading = false;
+  String? epgStatus;
+  Timer? _clock;
+  Timer? _epgDebounce;
+
   /// Channel URLs stored on the remote keys 0..9.
   List<String?> favorites = List.filled(10, null);
 
@@ -203,6 +220,19 @@ class AppState extends ChangeNotifier {
     if (db != null) _setDb(db);
     loading = false;
     notifyListeners();
+
+    // Program guide: cached data first, then refresh if needed.
+    final cached = await EpgService.load();
+    if (cached != null) {
+      epg = cached.$1;
+      epgFetched = cached.$2;
+      notifyListeners();
+    }
+    // Keeps "now" / progress of the guide up to date.
+    _clock = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (epg.isNotEmpty) notifyListeners();
+    });
+    unawaited(refreshEpg());
 
     final last = _prefs?.getString('lastChannel');
     final i = last == null ? -1 : indexOfUrl(last);
@@ -482,9 +512,138 @@ class AppState extends ChangeNotifier {
   bool isMyChannel(Channel c) => myChannels.contains(c.url);
 
   void toggleMyChannel(Channel c) {
-    if (!myChannels.remove(c.url)) myChannels.add(c.url);
+    final added = !myChannels.remove(c.url);
+    if (added) myChannels.add(c.url);
     _prefs?.setStringList('myChannels', myChannels);
     notifyListeners();
+    if (added && !epg.containsKey(c.url)) {
+      // Load the guide for the new favorite (a moment later, in case
+      // more favorites are added).
+      _epgDebounce?.cancel();
+      _epgDebounce = Timer(const Duration(seconds: 3), () => refreshEpg(force: true));
+    }
+  }
+
+  // ================= Program guide (EPG) =================
+
+  List<Programme> programmesOf(Channel c) => epg[c.url] ?? const [];
+
+  /// Programme running now on [c] (only for channels in My Channels).
+  Programme? nowOn(Channel c) {
+    final t = DateTime.now();
+    for (final p in programmesOf(c)) {
+      if (p.isOn(t)) return p;
+    }
+    return null;
+  }
+
+  Programme? nextOn(Channel c) {
+    final t = DateTime.now();
+    for (final p in programmesOf(c)) {
+      if (p.start.isAfter(t)) return p;
+    }
+    return null;
+  }
+
+  /// Loads the guide for My Channels. Without [force] only when the data is
+  /// older than 6 hours.
+  Future<void> refreshEpg({bool force = false}) async {
+    if (epgLoading) return;
+    final favs = myChannelList;
+    if (favs.isEmpty) return;
+    final fresh = epgFetched != null &&
+        DateTime.now().difference(epgFetched!) < const Duration(hours: 6);
+    if (!force && fresh) return;
+    epgLoading = true;
+    epgStatus = 'Loading program guide...';
+    notifyListeners();
+    try {
+      final data = await EpgService.fetch(favs, (s) {
+        epgStatus = s;
+        notifyListeners();
+      });
+      epg = data;
+      epgFetched = DateTime.now();
+      await EpgService.save(epg, epgFetched!);
+    } catch (e) {
+      epgStatus = 'Program guide could not be loaded.';
+    }
+    epgLoading = false;
+    notifyListeners();
+  }
+
+  // ================= Favorites export / import =================
+
+  /// My Channels and keys 0-9 as JSON (with full channel data, so they can
+  /// be imported on another device).
+  String exportFavorites() {
+    Map<String, dynamic>? ch(String? url) {
+      if (url == null) return null;
+      final i = indexOfUrl(url);
+      return i < 0 ? null : channels[i].toJson();
+    }
+
+    return const JsonEncoder.withIndent('  ').convert({
+      'app': 'SurfTV',
+      'type': 'favorites',
+      'version': 1,
+      'exported': DateTime.now().toIso8601String(),
+      'myChannels': [
+        for (final u in myChannels)
+          if (ch(u) != null) ch(u),
+      ],
+      'keys': [for (final u in favorites) ch(u)],
+    });
+  }
+
+  /// Adds the favorites of an exported file. Returns how many channels were
+  /// added to My Channels. Throws [FormatException] for a wrong file.
+  Future<int> importFavorites(String text) async {
+    final j = jsonDecode(text);
+    if (j is! Map || j['app'] != 'SurfTV' || j['type'] != 'favorites') {
+      throw const FormatException('This is not a SurfTV favorites file.');
+    }
+    final my = [
+      for (final e in (j['myChannels'] as List? ?? const []))
+        Channel.fromJson((e as Map).cast<String, dynamic>()),
+    ];
+    final keys = [
+      for (final e in (j['keys'] as List? ?? const []))
+        e == null ? null : Channel.fromJson((e as Map).cast<String, dynamic>()),
+    ];
+    // Channels that are not in the list yet are added to it.
+    final known = {for (final c in channels) c.url};
+    final extra = <Channel>[
+      for (final c in [...my, ...keys.whereType<Channel>()])
+        if (known.add(c.url)) c,
+    ];
+    if (extra.isNotEmpty) {
+      final db = ChannelDb(
+          channels: [...channels, ...extra],
+          countryNames: countryNames,
+          updated: listUpdated ?? DateTime.now());
+      final playing = current;
+      _setDb(db);
+      currentIndex = playing == null ? -1 : indexOfUrl(playing.url);
+      await Storage.saveDb(db);
+    }
+    var added = 0;
+    for (final c in my) {
+      final url = _replaced[c.url] ?? c.url;
+      if (!myChannels.contains(url)) {
+        myChannels.add(url);
+        added++;
+      }
+    }
+    for (var i = 0; i < 10 && i < keys.length; i++) {
+      final k = keys[i];
+      if (k != null) favorites[i] = _replaced[k.url] ?? k.url;
+    }
+    _prefs?.setStringList('myChannels', myChannels);
+    _prefs?.setString('favorites', jsonEncode(favorites));
+    notifyListeners();
+    unawaited(refreshEpg(force: true));
+    return added;
   }
 
   /// My Channels as channel objects (channels no longer in the list are skipped).
@@ -589,6 +748,8 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _scanner?.cancel();
+    _clock?.cancel();
+    _epgDebounce?.cancel();
     jobProgress.dispose();
     for (final s in _subs) {
       s.cancel();

@@ -187,6 +187,7 @@ class ChannelScanner {
           source: 'iptv-org',
           categories: cats,
           logo: chId == null ? null : logos[chId],
+          channelId: chId,
         ));
       }
       sourcesOk++;
@@ -454,6 +455,7 @@ class ChannelScanner {
         quality: sd ? 'SD' : null,
         geoBlocked: geo,
         source: 'Free-TV',
+        channelId: _attr(inf, 'tvg-id'),
       ));
     }
     return out;

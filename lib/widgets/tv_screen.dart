@@ -213,6 +213,15 @@ class _TvScreenState extends State<TvScreen> {
                         fontSize: 22, fontWeight: FontWeight.bold)),
               ),
             ]),
+            if (s.nowOn(c) != null)
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: Text(
+                  'Now: ${s.nowOn(c)!.title}',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
             const SizedBox(height: 4),
             Row(mainAxisSize: MainAxisSize.min, children: [
               FlagIcon(c.countryCode, width: 22),

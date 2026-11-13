@@ -16,12 +16,14 @@ class RemoteControl extends StatelessWidget {
     required this.onTest,
     required this.onAbout,
     required this.onSwitchUi,
+    required this.onSettings,
   });
 
   final AppState state;
   final VoidCallback onUpdate;
   final VoidCallback onTest;
   final VoidCallback onSwitchUi;
+  final VoidCallback onSettings;
   final VoidCallback onAbout;
 
   @override
@@ -182,6 +184,11 @@ class RemoteControl extends StatelessWidget {
               ),
             ),
             IconButton(
+              tooltip: 'Settings',
+              onPressed: onSettings,
+              icon: const Icon(Icons.settings, size: 20),
+            ),
+            IconButton(
               tooltip: 'Help',
               onPressed: () => showHelp(context),
               icon: const Icon(Icons.help_outline, size: 20),
@@ -237,6 +244,11 @@ class _Display extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontSize: 15, fontWeight: FontWeight.bold)),
+                if (state.nowOn(c) != null) ...[
+                  const SizedBox(height: 2),
+                  Text('> ${state.nowOn(c)!.title}',
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
                 const SizedBox(height: 6),
                 Row(children: [
                   FlagIcon(c.countryCode, width: 22),
