@@ -14,7 +14,8 @@ shot() {
 adb install -r "$APK"
 adb logcat -c
 adb shell am start -W -n $PKG/.MainActivity
-sleep 25
+sleep 45
+date
 adb shell input keyevent 4      # close info window
 sleep 3
 adb shell input keyevent 59     # dummy key (emulator drops the first key after BACK)
@@ -29,7 +30,8 @@ adb shell wm density 160
 adb shell am force-stop $PKG
 sleep 2
 adb shell am start -W -n $PKG/.MainActivity
-sleep 20
+sleep 45
+date
 adb shell input keyevent 4      # close info window
 sleep 3
 adb shell input keyevent 59     # dummy key
@@ -53,5 +55,5 @@ shot classic_wide
 echo "===== PROCESS ====="
 adb shell pidof $PKG || echo "PROCESS NOT RUNNING"
 echo "===== APP LOG ====="
-adb logcat -d -v brief | grep -iE "flutter|surftv|AndroidRuntime|FATAL" | tail -n 80
+adb logcat -d -v time | grep -iE "flutter|surftv|AndroidRuntime|FATAL|Choreographer" | tail -n 80
 exit 0
