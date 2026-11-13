@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
 
+env:
+  # Version of the release that is created/updated from main.
+  APP_VERSION: '0.1a'
+
 jobs:
   build:
     name: ${{ matrix.name }}
@@ -100,7 +104,7 @@ jobs:
 
   release:
     name: GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -110,8 +114,10 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: SurfTV ${{ github.ref_name }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', env.APP_VERSION) }}
+          target_commitish: ${{ github.sha }}
+          name: SurfTV ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', env.APP_VERSION) }}
+          make_latest: true
           body: |
             SurfTV - free internet TV from all over the world.
             Written by IT-Dummkopfen with the help of an AI.
