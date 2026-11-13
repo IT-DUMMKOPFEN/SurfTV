@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Starts SurfTV in an Android emulator, takes screenshots and prints them
 # as base64 (between SHOT markers) plus the app log. Used by CI.
+# Note: the CI emulator has no hardware keyboard and only passes key events
+# to the app after about a minute, so keys are sent late and the rest is
+# done with taps.
 APK=build/app/outputs/flutter-apk/app-release.apk
 PKG=de.itdummkopfen.surftv
 
@@ -13,45 +16,48 @@ shot() {
 
 adb install -r "$APK"
 adb logcat -c
-adb shell am start -W -n $PKG/.MainActivity
-sleep 30
-adb shell input keyevent 4      # close info window
-sleep 3
-adb shell input tap 160 150     # touch the TV once - the emulator sends keys only after a touch
-shot classic_phone
-adb shell input keyevent 131    # F1 -> TV like
-sleep 4
-shot tv_phone
 
 # Landscape "TV" screen: 1280x720
 adb shell wm size 1280x720
 adb shell wm density 160
-adb shell am force-stop $PKG
-sleep 2
 adb shell am start -W -n $PKG/.MainActivity
 sleep 30
 adb shell input keyevent 4      # close info window
 sleep 3
-adb shell input tap 900 300     # touch the TV picture once
-shot tv_wide
-adb shell input keyevent 19     # arrow up -> first channel plays
-sleep 15
-shot tv_playing
-adb shell input swipe 640 650 640 150 600   # scroll down to the categories
-sleep 3
-shot tv_rows
-adb shell input tap 407 54      # Discover
-sleep 4
-shot tv_discover
-adb shell input tap 800 54      # Categories
-sleep 4
-shot tv_categories
-adb shell input keyevent 131    # F1 -> Classic
-sleep 4
 shot classic_wide
+sleep 60
+adb shell input keyevent 131    # F1 -> TV like
+sleep 5
+shot tv_wide
+adb shell input tap 408 54      # Discover
+sleep 5
+shot tv_discover
+adb shell input tap 130 430     # first channel tile
+sleep 15
+shot tv_discover_play
+adb shell input tap 518 54      # Live TV
+sleep 5
+shot tv_live
+adb shell input swipe 640 650 640 150 600   # scroll down to the categories
+sleep 4
+shot tv_rows
+adb shell input tap 800 54      # Categories
+sleep 5
+shot tv_categories
+
+# Phone (portrait) - TV like is remembered
+adb shell wm size reset
+adb shell wm density reset
+adb shell am force-stop $PKG
+sleep 2
+adb shell am start -W -n $PKG/.MainActivity
+sleep 30
+adb shell input keyevent 4
+sleep 3
+shot tv_phone
 
 echo "===== PROCESS ====="
 adb shell pidof $PKG || echo "PROCESS NOT RUNNING"
 echo "===== APP LOG ====="
-adb logcat -d -v time | grep -iE "flutter|surftv|AndroidRuntime|FATAL|Choreographer" | tail -n 80
+adb logcat -d -v time | grep -iE "flutter|AndroidRuntime|FATAL" | tail -n 60
 exit 0
