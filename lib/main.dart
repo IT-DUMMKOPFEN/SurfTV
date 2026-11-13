@@ -92,8 +92,18 @@ class _HomePageState extends State<HomePage> {
 
   AppState get s => widget.state;
 
+  /// Keys are taken directly from the keyboard, so they work no matter
+  /// which button has the focus (e.g. after closing a dialog).
+  bool _onHardwareKey(KeyEvent e) {
+    if (!mounted) return false;
+    // A dialog is open: let it have the keys.
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return false;
+    return _onKey(_focus, e) == KeyEventResult.handled;
+  }
+
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onHardwareKey);
     _focus.dispose();
     super.dispose();
   }
@@ -174,6 +184,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_onHardwareKey);
     // Show the info window when the app starts.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _about();
@@ -205,7 +216,6 @@ class _HomePageState extends State<HomePage> {
     return Focus(
       focusNode: _focus,
       autofocus: true,
-      onKeyEvent: _onKey,
       child: LayoutBuilder(builder: (context, box) {
         // ---- Fullscreen / Watch Live: only the picture ----
         if (s.videoOnly) {

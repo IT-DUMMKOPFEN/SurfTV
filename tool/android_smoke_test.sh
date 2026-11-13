@@ -15,7 +15,6 @@ adb install -r "$APK"
 adb logcat -c
 adb shell am start -W -n $PKG/.MainActivity
 sleep 25
-shot start
 adb shell input keyevent 4      # close info window
 sleep 3
 shot classic_phone
@@ -32,9 +31,19 @@ adb shell am start -W -n $PKG/.MainActivity
 sleep 20
 adb shell input keyevent 4      # close info window
 sleep 3
-adb shell input keyevent 19     # zap -> first channel plays
-sleep 20
 shot tv_wide
+adb shell input keyevent 19     # arrow up -> first channel plays
+sleep 15
+shot tv_playing
+adb shell input swipe 640 650 640 150 600   # scroll down to the categories
+sleep 3
+shot tv_rows
+adb shell input tap 407 54      # Discover
+sleep 4
+shot tv_discover
+adb shell input tap 800 54      # Categories
+sleep 4
+shot tv_categories
 adb shell input keyevent 131    # F1 -> Classic
 sleep 4
 shot classic_wide
