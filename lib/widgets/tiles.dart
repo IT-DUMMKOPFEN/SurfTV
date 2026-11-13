@@ -322,7 +322,11 @@ class TileGrid extends StatefulWidget {
     this.tileHeight = 124,
     this.centerIndex,
     this.spacing = 14,
+    this.shrink = false,
   });
+
+  /// Grid inside a page that scrolls as a whole (small screens).
+  final bool shrink;
 
   final int itemCount;
   final IndexedWidgetBuilder itemBuilder;
@@ -392,7 +396,9 @@ class _TileGridState extends State<TileGrid> {
           .floor()
           .clamp(1, 50);
       return GridView.builder(
-        controller: _ctrl,
+        controller: widget.shrink ? null : _ctrl,
+        shrinkWrap: widget.shrink,
+        physics: widget.shrink ? const NeverScrollableScrollPhysics() : null,
         padding: const EdgeInsets.all(_pad),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _cols,

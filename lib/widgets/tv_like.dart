@@ -187,7 +187,7 @@ class _TopBar extends StatelessWidget {
           ),
       ]);
 
-      final actions = Row(mainAxisSize: MainAxisSize.min, children: [
+      final volume = <Widget>[
         IconButton(
           tooltip: 'Quieter',
           icon: const Icon(Icons.volume_down),
@@ -220,6 +220,8 @@ class _TopBar extends StatelessWidget {
           icon: const Icon(Icons.fullscreen),
           onPressed: () => s.setFullscreen(true),
         ),
+      ];
+      final tools = <Widget>[
         IconButton(
           tooltip: 'Search by name',
           icon: const Icon(Icons.search),
@@ -230,12 +232,23 @@ class _TopBar extends StatelessWidget {
           icon: const Icon(Icons.settings),
           onPressed: onSettings,
         ),
-      ]);
+      ];
+      final actions =
+          Row(mainAxisSize: MainAxisSize.min, children: [...volume, ...tools]);
+      final tiny = box.maxWidth < 640;
 
       return Container(
         color: scheme.surfaceContainer,
         padding: EdgeInsets.fromLTRB(narrow ? 10 : 40, 6, narrow ? 6 : 30, 6),
-        child: narrow
+        child: tiny
+            ? Column(children: [
+                Row(children: [logo, const Spacer(), ...tools]),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(children: [nav, const SizedBox(width: 8), ...volume]),
+                ),
+              ])
+            : narrow
             ? Column(children: [
                 Row(children: [logo, const Spacer(), actions]),
                 SingleChildScrollView(
@@ -317,6 +330,22 @@ Widget _hint(BuildContext context, String text) => Padding(
               .bodyLarge
               ?.copyWith(color: Theme.of(context).hintColor)),
     );
+
+/// Headers on top, grid below. On low screens (phones) the whole page
+/// scrolls, so the grid gets enough room.
+Widget _pageLayout(List<Widget> header, Widget Function(bool shrink) grid) =>
+    LayoutBuilder(builder: (context, box) {
+      if (box.maxHeight < 700) {
+        return SingleChildScrollView(
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [...header, grid(true)]),
+        );
+      }
+      return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [...header, Expanded(child: grid(false))]);
+    });
 
 const _categoryNames = {
   'movies': 'Movies',
@@ -716,7 +745,7 @@ class _DiscoverPage extends StatelessWidget {
         ? s.lastCountry!
         : countries.first;
     final list = s.channelsOf(country);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return _pageLayout([
       _title(context, 'Discover', sub: '${countries.length} countries'),
       _CountryRow(
         state: s,
@@ -724,14 +753,12 @@ class _DiscoverPage extends StatelessWidget {
         selected: country,
       ),
       _title(context, s.countryName(country), sub: '${list.length} channels'),
-      Expanded(
-        child: TileGrid(
+    ], (shrink) => TileGrid(
+          shrink: shrink,
           itemCount: list.length,
           centerIndex: list.indexWhere((c) => c.url == s.current?.url),
           itemBuilder: (_, i) => ChannelTile(state: s, channel: list[i]),
-        ),
-      ),
-    ]);
+        ));
   }
 }
 
@@ -783,24 +810,25 @@ class _MyChannelsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = state;
     final my = s.myChannelList;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _title(context, 'My Channels', sub: '${my.length}'),
-      if (my.isEmpty)
+    if (my.isEmpty) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _title(context, 'My Channels', sub: '0'),
         _hint(context,
-            'No favorites yet. Watch a channel and press "+ Favorite" on Live TV.')
-      else
-        Expanded(
-          child: TileGrid(
-            itemCount: my.length,
-            centerIndex: my.indexWhere((c) => c.url == s.current?.url),
-            itemBuilder: (_, i) => ChannelTile(
-              state: s,
-              channel: my[i],
-              onRemove: () => s.toggleMyChannel(my[i]),
-            ),
+            'No favorites yet. Watch a channel and press "+ Favorite" on Live TV.'),
+      ]);
+    }
+    return _pageLayout([
+      _title(context, 'My Channels', sub: '${my.length}'),
+    ], (shrink) => TileGrid(
+          shrink: shrink,
+          itemCount: my.length,
+          centerIndex: my.indexWhere((c) => c.url == s.current?.url),
+          itemBuilder: (_, i) => ChannelTile(
+            state: s,
+            channel: my[i],
+            onRemove: () => s.toggleMyChannel(my[i]),
           ),
-        ),
-    ]);
+        ));
   }
 }
 
@@ -823,7 +851,7 @@ class _CategoriesPage extends StatelessWidget {
     final list =
         country == null ? <Channel>[] : s.channelsOf(country, category: cat);
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    final header = <Widget>[
       _title(context, 'Categories'),
       Padding(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
@@ -831,36 +859,34 @@ class _CategoriesPage extends StatelessWidget {
           for (final k in kCategories)
             ChoiceChip(
               avatar: Icon(_categoryIcons[k]),
-              label: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                child: Text(_categoryNames[k]!,
-                    style: const TextStyle(fontSize: 18)),
-              ),
+              label: Text(_categoryNames[k]!,
+                  style: const TextStyle(fontSize: 17)),
               selected: k == cat,
               onSelected: (_) => s.setTvCategory(k),
             ),
         ]),
       ),
-      if (country == null)
-        _hint(context, 'No channels in this category.')
-      else ...[
-        _CountryRow(
-          state: s,
-          countries: countries,
-          selected: country,
-          category: cat,
-        ),
-        _title(context, '${_categoryNames[cat]} · ${s.countryName(country)}',
-            sub: '${list.length} channels'),
-        Expanded(
-          child: TileGrid(
-            itemCount: list.length,
-            centerIndex: list.indexWhere((c) => c.url == s.current?.url),
-            itemBuilder: (_, i) => ChannelTile(state: s, channel: list[i]),
-          ),
-        ),
-      ],
-    ]);
+    ];
+    if (country == null) {
+      return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [...header, _hint(context, 'No channels in this category.')]);
+    }
+    return _pageLayout([
+      ...header,
+      _CountryRow(
+        state: s,
+        countries: countries,
+        selected: country,
+        category: cat,
+      ),
+      _title(context, '${_categoryNames[cat]} · ${s.countryName(country)}',
+          sub: '${list.length} channels'),
+    ], (shrink) => TileGrid(
+          shrink: shrink,
+          itemCount: list.length,
+          centerIndex: list.indexWhere((c) => c.url == s.current?.url),
+          itemBuilder: (_, i) => ChannelTile(state: s, channel: list[i]),
+        ));
   }
 }
