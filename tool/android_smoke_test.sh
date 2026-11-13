@@ -25,7 +25,8 @@ sleep 30
 adb shell input keyevent 4      # close info window
 sleep 3
 shot classic_wide
-sleep 60
+adb shell input tap 407 54      # tap a free spot first (needed for keys in the CI emulator)
+sleep 3
 adb shell input keyevent 131    # F1 -> TV like
 sleep 5
 shot tv_wide
