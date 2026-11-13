@@ -58,4 +58,6 @@ echo "===== PROCESS ====="
 adb shell pidof $PKG || echo "PROCESS NOT RUNNING"
 echo "===== APP LOG ====="
 adb logcat -d -v time | grep -iE "flutter|AndroidRuntime|FATAL" | tail -n 60
+echo "===== SYSTEM LOG ====="
+adb logcat -d -v time | grep -iE "surftv|lowmemory|lmkd|has died|Fatal signal|DEBUG|ANR in|crash|backtrace|libmpv|SIGSEGV|SIGABRT" | tail -n 120
 exit 0
