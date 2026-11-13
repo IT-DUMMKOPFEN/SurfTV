@@ -169,23 +169,53 @@ class _HomePageState extends State<HomePage> {
     _focus.requestFocus();
   }
 
+  /// Info window (also shown when the app starts).
   void _about() {
     showDialog<void>(
       context: context,
-      builder: (_) => AboutDialog(
-        applicationName: 'SurfTV',
-        applicationVersion: appVersion,
-        applicationIcon:
-            Image.asset('assets/icon/icon.png', width: 72, height: 72),
-        applicationLegalese:
-            'Written by IT-Dummkopfen with the help of an AI.',
-        children: const [
-          SizedBox(height: 12),
-          Text('Channel lists: iptv-org (github.com/iptv-org/iptv) and '
-              'Free-TV (github.com/Free-TV/IPTV).\n'
-              'SurfTV only plays streams that are publicly available on the '
-              'internet. The "VPN" hint means the broadcaster probably limits '
-              'the stream to its own country.'),
+      builder: (ctx) => AlertDialog(
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset('assets/icon/icon.png',
+                    width: 110, height: 110),
+              ),
+              const SizedBox(height: 12),
+              Text('SurfTV', style: Theme.of(ctx).textTheme.headlineSmall),
+              Text('Version $appVersion',
+                  style: Theme.of(ctx).textTheme.bodySmall),
+              const SizedBox(height: 10),
+              const Text('Written by IT-Dummkopfen with the help of an AI.',
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 14),
+              const Text(
+                'Free internet TV from all over the world.\n\n'
+                'Channel lists: iptv-org (github.com/iptv-org/iptv) and '
+                'Free-TV (github.com/Free-TV/IPTV). SurfTV only plays streams '
+                'that are publicly available on the internet. The "VPN" hint '
+                'means the broadcaster probably limits the stream to its own '
+                'country.',
+                textAlign: TextAlign.center,
+              ),
+            ]),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => showLicensePage(
+              context: ctx,
+              applicationName: 'SurfTV',
+              applicationVersion: appVersion,
+            ),
+            child: const Text('Licenses'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
         ],
       ),
     ).then((_) {

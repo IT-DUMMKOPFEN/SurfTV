@@ -123,32 +123,35 @@ class _TvScreenState extends State<TvScreen> {
   }
 
   /// Start picture (SurfTV logo, 16:9) until the first video picture.
-  Widget _startPicture(AppState s) => Stack(fit: StackFit.expand, children: [
-        Image.asset('assets/tv_background.jpg', fit: BoxFit.cover),
-        if (s.current == null)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 10,
-            child: Center(
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  s.channels.isEmpty
-                      ? 'Press "Update" on the remote to search for channels.'
-                      : 'Pick a channel from the list or zap with the remote.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
+  Widget _startPicture(AppState s) => LayoutBuilder(
+        builder: (context, box) => Stack(fit: StackFit.expand, children: [
+          Image.asset('assets/tv_background.jpg', fit: BoxFit.cover),
+          // The hint would cover the logo on small screens.
+          if (s.current == null && box.maxWidth >= 560)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 10,
+              child: Center(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    s.channels.isEmpty
+                        ? 'Press "Update" on the remote to search for channels.'
+                        : 'Pick a channel from the list or zap with the remote.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                  ),
                 ),
               ),
             ),
-          ),
-      ]);
+        ]),
+      );
 
   Widget _error(AppState s) {
     final c = s.current!;
