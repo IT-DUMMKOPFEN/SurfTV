@@ -209,10 +209,17 @@ class AppState extends ChangeNotifier {
     if (i >= 0) unawaited(play(i));
   }
 
+  /// URL of a removed duplicate -> URL of the kept channel (last clean up).
+  Map<String, String> _replaced = {};
+
   void _setDb(ChannelDb db) {
     countryNames = db.countryNames;
     listUpdated = db.updated;
-    final list = List<Channel>.from(db.channels);
+    // Clean up: only one channel per stream address.
+    final clean = dedupeChannels(db.channels);
+    _replaced = clean.replaced;
+    _remapFavorites();
+    final list = List<Channel>.from(clean.channels);
     String key(Channel c) =>
         '${c.countryCode == 'XX' ? '~' : countryName(c.countryCode).toLowerCase()}'
         '|${c.name.toLowerCase()}';
@@ -224,6 +231,31 @@ class AppState extends ChangeNotifier {
       ..addAll({for (var i = 0; i < list.length; i++) list[i].url: i});
 
     _rebuildVisible();
+  }
+
+  /// My Channels and keys 0-9 that pointed to a removed duplicate now point
+  /// to the channel that was kept.
+  void _remapFavorites() {
+    if (_replaced.isEmpty) return;
+    var changed = false;
+    final my = <String>[];
+    for (final u in myChannels) {
+      final n = _replaced[u] ?? u;
+      if (n != u) changed = true;
+      if (!my.contains(n)) my.add(n);
+    }
+    myChannels = my;
+    for (var i = 0; i < favorites.length; i++) {
+      final u = favorites[i];
+      if (u != null && _replaced.containsKey(u)) {
+        favorites[i] = _replaced[u];
+        changed = true;
+      }
+    }
+    if (changed) {
+      _prefs?.setStringList('myChannels', myChannels);
+      _prefs?.setString('favorites', jsonEncode(favorites));
+    }
   }
 
   /// Applies the VPN + category filter.
@@ -284,14 +316,32 @@ class AppState extends ChangeNotifier {
       list = byUrl.values.toList();
       names = {...countryNames, ...db.countryNames};
     }
-    if (playing != null && !list.any((c) => c.url == playing.url)) {
-      list = [...list, playing];
+    // Channels in My Channels, on the keys 0-9 and the one you are watching
+    // always stay in the list.
+    final urls = {for (final c in list) c.url};
+    final keep = <String>{
+      ...myChannels,
+      for (final f in favorites)
+        if (f != null) f,
+      if (playing != null) playing.url,
+    };
+    final extra = <Channel>[
+      for (final u in keep)
+        if (!urls.contains(u) && indexOfUrl(u) >= 0) channels[indexOfUrl(u)],
+    ];
+    if (playing != null &&
+        !urls.contains(playing.url) &&
+        !extra.any((c) => c.url == playing.url)) {
+      extra.add(playing);
     }
+    list = [...list, ...extra];
+    _setDb(ChannelDb(channels: list, countryNames: names, updated: db.updated));
     final result =
-        ChannelDb(channels: list, countryNames: names, updated: db.updated);
-    _setDb(result);
+        ChannelDb(channels: channels, countryNames: names, updated: db.updated);
     // Only the index changes - the player is not touched, so TV keeps running.
-    currentIndex = playing == null ? -1 : indexOfUrl(playing.url);
+    currentIndex = playing == null
+        ? -1
+        : indexOfUrl(_replaced[playing.url] ?? playing.url);
     notifyListeners();
     await Storage.saveDb(result);
   }

@@ -16,6 +16,7 @@ import pathlib
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 API = "https://iptv-org.github.io/api"
@@ -110,6 +111,38 @@ def free_tv():
     return out
 
 
+def stream_path(url):
+    """Host + path, lower-case host, no trailing slash, no default port."""
+    try:
+        u = urllib.parse.urlsplit(url.strip())
+        path = u.path
+        while len(path) > 1 and path.endswith("/"):
+            path = path[:-1]
+        port = f":{u.port}" if u.port and u.port not in (80, 443) else ""
+        return f"{(u.hostname or '').lower()}{port}{path}", u.query
+    except Exception:
+        return url.strip().lower(), ""
+
+
+def dedupe(chans):
+    """Same rules as dedupeChannels() in lib/models.dart."""
+    by_key, out = {}, []
+    for c in chans:
+        path, query = stream_path(c["u"])
+        k1, k2 = f"{path}?{query}", f"{path}#{c['n'].strip().lower()}"
+        hit = by_key.get(k1, by_key.get(k2))
+        if hit is not None:
+            kept = out[hit]
+            if not kept.get("l") and c.get("l"):
+                kept["l"] = c["l"]
+            kept["k"] = sorted(set(kept.get("k") or []) | set(c.get("k") or []))
+            kept["g"] = bool(kept.get("g") or c.get("g"))
+            continue
+        by_key[k1] = by_key[k2] = len(out)
+        out.append(c)
+    return out
+
+
 def check(ch):
     """'ok', 'vpn' or 'dead' - same rules as the app."""
     url = ch["u"]
@@ -141,6 +174,10 @@ def main():
                 seen.add(c["u"])
                 cands.append(c)
         print(f"{name}: {len(items)} streams")
+
+    before = len(cands)
+    cands = dedupe(cands)
+    print(f"clean up: {before - len(cands)} duplicates removed")
 
     found = []
     with cf.ThreadPoolExecutor(max_workers=96) as ex:

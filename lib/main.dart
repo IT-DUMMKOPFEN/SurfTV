@@ -9,6 +9,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_state.dart';
+import 'channel_scanner.dart';
 import 'widgets/channel_list.dart';
 import 'widgets/dialogs.dart';
 import 'widgets/remote_control.dart';
@@ -191,6 +192,14 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  /// Update link in the info window: start the update right away.
+  void _quickUpdate() {
+    if (!s.jobRunning) s.startJob(JobKind.update, TestMode.quick);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) showJobProgress(context, s).then((_) => _focus.requestFocus());
+    });
+  }
+
   Future<void> _job(JobKind kind) async {
     await showJobStart(context, s, initial: kind);
     _focus.requestFocus();
@@ -198,7 +207,7 @@ class _HomePageState extends State<HomePage> {
 
   /// Info window (also shown when the app starts).
   void _about() {
-    showInfo(context).then((_) {
+    showInfo(context, onUpdate: _quickUpdate).then((_) {
       if (mounted) _focus.requestFocus();
     });
   }

@@ -1,4 +1,4 @@
-# SurfTV 0.3b
+# SurfTV 0.5b
 
 Watch free-to-air internet TV channels from all over the world.
 Windows · Linux · macOS · Android
@@ -25,7 +25,7 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 ### Two interfaces – switch with **F1** (or the switch in the settings / on the remote)
 
 **TV like** – feels like a modern smart TV:
-- Top bar: Search (channel search), Discover (countries → channels), Live TV, My Channels (favorites), Categories (Movies, Series, Docu, News, Music → countries → channels), volume – % +, fullscreen, name search (magnifier), settings (gear)
+- Top bar: Update (channel list update / test), Discover (countries → channels), Live TV, My Channels (favorites), Categories (Movies, Series, Docu, News, Music → countries → channels), volume – % +, fullscreen, name search (magnifier), settings (gear)
 - Live TV: channel name, flag, **Watch Live** (picture fills the window) and **+ Favorite**, the running stream next to it; below: My Channels and the categories as swipeable rows
 - Channel tiles with logo (if available), name and flag – swipe with mouse or finger
 - Arrow left: channel list, arrow right: remote control

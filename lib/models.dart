@@ -68,6 +68,23 @@ class Channel {
         logo: logo,
       );
 
+  /// Keeps this channel, but takes over logo, categories and flags of a
+  /// duplicate of the same stream.
+  Channel mergedWith(Channel o) => Channel(
+        name: name,
+        countryCode: countryCode == 'XX' ? o.countryCode : countryCode,
+        url: url,
+        referrer: referrer ?? o.referrer,
+        userAgent: userAgent ?? o.userAgent,
+        quality: quality ?? o.quality,
+        geoBlocked: geoBlocked || o.geoBlocked,
+        notAlways: notAlways,
+        vpnLikely: vpnLikely,
+        source: source,
+        categories: {...categories, ...o.categories}.toList(),
+        logo: logo ?? o.logo,
+      );
+
   Map<String, dynamic> toJson() => {
         'n': name,
         'c': countryCode,
@@ -137,4 +154,65 @@ class ChannelDb {
         updated: DateTime.tryParse(j['updated'] as String? ?? '') ??
             DateTime.now(),
       );
+}
+
+// =====================================================================
+// Clean up: remove channels that point to the same stream
+// =====================================================================
+
+/// Host + path of a stream URL, lower-case host, without trailing "/"
+/// and without default ports. "http" and "https" count as the same.
+String streamPath(String url) {
+  try {
+    final u = Uri.parse(url.trim());
+    var path = u.path;
+    while (path.length > 1 && path.endsWith('/')) {
+      path = path.substring(0, path.length - 1);
+    }
+    final port = (u.hasPort && u.port != 80 && u.port != 443) ? ':${u.port}' : '';
+    return '${u.host.toLowerCase()}$port$path';
+  } catch (_) {
+    return url.trim().toLowerCase();
+  }
+}
+
+/// Result of [dedupeChannels].
+class DedupeResult {
+  DedupeResult(this.channels, this.replaced);
+
+  /// The list without duplicates (order kept, first one wins).
+  final List<Channel> channels;
+
+  /// URL of a removed duplicate -> URL of the channel that was kept.
+  final Map<String, String> replaced;
+
+  int get removed => replaced.length;
+}
+
+/// Two channels are the same stream when
+///  * host + path + query of their URLs are equal, or
+///  * host + path are equal and they have the same name
+///    (e.g. the same stream with different tracking parameters).
+/// The first one is kept; missing logo/categories are taken over.
+DedupeResult dedupeChannels(List<Channel> list) {
+  final byKey = <String, int>{};
+  final out = <Channel>[];
+  final replaced = <String, String>{};
+  for (final c in list) {
+    final path = streamPath(c.url);
+    final query = Uri.tryParse(c.url.trim())?.query ?? '';
+    final k1 = '$path?$query';
+    final k2 = '$path#${c.name.trim().toLowerCase()}';
+    final hit = byKey[k1] ?? byKey[k2];
+    if (hit != null) {
+      final kept = out[hit];
+      if (kept.url != c.url) replaced[c.url] = kept.url;
+      out[hit] = kept.mergedWith(c);
+      continue;
+    }
+    byKey[k1] = out.length;
+    byKey[k2] = out.length;
+    out.add(c);
+  }
+  return DedupeResult(out, replaced);
 }

@@ -4,10 +4,11 @@ import '../app_state.dart';
 import '../models.dart';
 import 'flag.dart';
 
-const appVersion = '0.3b';
+const appVersion = '0.5b';
 
 /// Info window (also shown when the app starts).
-Future<void> showInfo(BuildContext context) {
+/// [onUpdate] shows an "Update channel list" link at the bottom left.
+Future<void> showInfo(BuildContext context, {VoidCallback? onUpdate}) {
   return showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -40,19 +41,34 @@ Future<void> showInfo(BuildContext context) {
           ]),
         ),
       ),
+      actionsAlignment: MainAxisAlignment.spaceBetween,
       actions: [
-        TextButton(
-          onPressed: () => showLicensePage(
-            context: ctx,
-            applicationName: 'SurfTV',
-            applicationVersion: appVersion,
+        if (onUpdate != null)
+          TextButton.icon(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              onUpdate();
+            },
+            icon: const Icon(Icons.radar),
+            label: const Text('Update channel list'),
+          )
+        else
+          const SizedBox.shrink(),
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          TextButton(
+            onPressed: () => showLicensePage(
+              context: ctx,
+              applicationName: 'SurfTV',
+              applicationVersion: appVersion,
+            ),
+            child: const Text('Licenses'),
           ),
-          child: const Text('Licenses'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('OK'),
-        ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
+        ]),
       ],
     ),
   );
@@ -108,7 +124,10 @@ Future<void> showHelp(BuildContext context) {
                   'fills the window) and "+ Favorite" (adds the channel to My '
                   'Channels). Below: My Channels and the categories. '
                   'Swipe the rows with the mouse or your finger.'),
-              p('Search: update the channel list or test your channels.'),
+              p('Update: read in the complete channel list again or test '
+                  'your channels. After every update, channels with the same '
+                  'stream address are removed automatically (clean up). '
+                  'Channels in My Channels and on the keys 0-9 always stay.'),
               p('Discover: pick a country, then a channel.'),
               p('My Channels: your favorites. Remove with the x.'),
               p('Categories: Movies, Series, Docu, News and Music - pick a '

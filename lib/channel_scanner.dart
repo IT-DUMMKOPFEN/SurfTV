@@ -50,7 +50,11 @@ class ScanProgress {
     this.found = 0,
     this.vpn = 0,
     this.recent = const [],
+    this.duplicates = 0,
   });
+
+  /// Channels removed by the clean up (same stream address).
+  final int duplicates;
 
   final ScanPhase phase;
   final String message;
@@ -209,7 +213,17 @@ class ChannelScanner {
     }
     if (_cancelled) return _db([]);
 
-    // ---- 3. Read in the complete list (no test - use "Test" afterwards) ----
+    // ---- 3. Clean up: only one channel per stream address ----
+    onProgress(ScanProgress(
+        message: 'Cleaning up: looking for double stream addresses...',
+        total: candidates.length));
+    final clean = dedupeChannels(candidates);
+    final dups = clean.removed;
+    candidates
+      ..clear()
+      ..addAll(clean.channels);
+
+    // ---- 4. Read in the complete list (no test - use "Test" afterwards) ----
     // Counted up in steps, like the channel search of a TV.
     final recent = <Channel>[];
     var vpn = 0;
@@ -230,18 +244,20 @@ class ChannelScanner {
         found: end,
         vpn: vpn,
         recent: List.unmodifiable(recent),
+        duplicates: dups,
       ));
       await Future<void>.delayed(const Duration(milliseconds: 15));
     }
     onProgress(ScanProgress(
       phase: ScanPhase.done,
-      message: 'Complete list read in: ${candidates.length} channels. '
-          'Use "Test" to keep only working channels.',
+      message: 'Complete list read in: ${candidates.length} channels, '
+          '$dups duplicates removed. Use "Test" to keep only working channels.',
       total: candidates.length,
       checked: candidates.length,
       found: candidates.length,
       vpn: vpn,
       recent: List.unmodifiable(recent),
+      duplicates: dups,
     ));
     return _db(candidates);
   }

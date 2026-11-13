@@ -130,7 +130,7 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onSettings;
 
   static const _nav = [
-    ('Search', TvTab.search),
+    ('Update', TvTab.search),
     ('Discover', TvTab.discover),
     ('Live TV', TvTab.live),
     ('My Channels', TvTab.my),
@@ -668,7 +668,7 @@ class _SearchPageState extends State<_SearchPage> {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(28, 10, 28, 28),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _title(context, 'Channel search',
+        _title(context, 'Update',
             sub: '${s.channels.length} channels in your list'),
         const SizedBox(height: 16),
         Padding(

@@ -233,7 +233,10 @@ class JobProgressPanel extends StatelessWidget {
                       _counter('${p.found}', isTest ? 'working' : 'channels', _lcd),
                       _counter('${p.vpn}', 'need VPN', const Color(0xFFFFB74D)),
                       if (isTest)
-                        _counter('${p.dead}', 'removed', const Color(0xFFEF5350)),
+                        _counter('${p.dead}', 'removed', const Color(0xFFEF5350))
+                      else
+                        _counter('${p.duplicates}', 'duplicates removed',
+                            const Color(0xFFEF5350)),
                     ],
                   ),
                   const SizedBox(height: 12),
