@@ -14,11 +14,10 @@ shot() {
 adb install -r "$APK"
 adb logcat -c
 adb shell am start -W -n $PKG/.MainActivity
-sleep 45
-date
+sleep 30
 adb shell input keyevent 4      # close info window
 sleep 3
-adb shell input keyevent 59     # dummy key (emulator drops the first key after BACK)
+adb shell input tap 160 150     # touch the TV once - the emulator sends keys only after a touch
 shot classic_phone
 adb shell input keyevent 131    # F1 -> TV like
 sleep 4
@@ -30,11 +29,10 @@ adb shell wm density 160
 adb shell am force-stop $PKG
 sleep 2
 adb shell am start -W -n $PKG/.MainActivity
-sleep 45
-date
+sleep 30
 adb shell input keyevent 4      # close info window
 sleep 3
-adb shell input keyevent 59     # dummy key
+adb shell input tap 900 300     # touch the TV picture once
 shot tv_wide
 adb shell input keyevent 19     # arrow up -> first channel plays
 sleep 15

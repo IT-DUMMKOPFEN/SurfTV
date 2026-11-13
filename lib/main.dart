@@ -96,10 +96,6 @@ class _HomePageState extends State<HomePage> {
   /// which button has the focus (e.g. after closing a dialog).
   bool _onHardwareKey(KeyEvent e) {
     if (!mounted) return false;
-    if (e is KeyDownEvent) {
-      debugPrint('SurfTV key: ${e.logicalKey.debugName} '
-          'route=${ModalRoute.of(context)?.isCurrent}');
-    }
     // A dialog is open: let it have the keys.
     if (!(ModalRoute.of(context)?.isCurrent ?? true)) return false;
     return _onKey(_focus, e) == KeyEventResult.handled;
