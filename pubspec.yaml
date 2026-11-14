@@ -32,7 +32,6 @@ flutter:
     - assets/channels_default.json
     - assets/tv_background.jpg
     - assets/own.png
-    - assets/youtube.png
 
 # App icon: a TV with a surfboard gliding on a wave.
 # Generate with:  dart run flutter_launcher_icons

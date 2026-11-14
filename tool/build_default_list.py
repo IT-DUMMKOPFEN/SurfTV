@@ -101,18 +101,15 @@ def free_tv():
             continue
         url, inf, info = line, info, None
         low = url.lower()
-        if any(x in low for x in ("twitch.tv", "dailymotion.com")):
-            continue
-        youtube = is_youtube(url)
+        if is_youtube(url) or any(x in low for x in ("twitch.tv", "dailymotion.com")):
+            continue   # cannot be played
         q = inf.rfind('",')
         name = inf[q + 2:] if q >= 0 else inf[inf.rfind(",") + 1:]
         geo, sd = "Ⓖ" in name, "Ⓢ" in name
         name = re.sub("[ⓎⓉⒹⓈⒼ]", "", name).strip() or attr(inf, "tvg-name") or "Unknown"
         country = (attr(inf, "tvg-country") or "").upper()
-        vid = yt_id(url) if youtube else None
-        out.append({"n": name, "c": "YT" if youtube else (country if len(country) == 2 else "XX"), "u": url,
+        out.append({"n": name, "c": country if len(country) == 2 else "XX", "u": url,
                     "i": attr(inf, "tvg-id"),
-                    "l": f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg" if vid else None,
                     "q": "SD" if sd else None, "g": geo, "s": "Free-TV"})
     return out
 
@@ -122,16 +119,11 @@ def is_youtube(url):
     return "youtube.com/" in u or "youtube-nocookie.com/" in u or "youtu.be/" in u
 
 
-def yt_id(url):
-    m = re.search(r"(?:youtu\.be/|/embed/|/live/|/shorts/|[?&]v=)([A-Za-z0-9_-]{11})", url)
-    return m.group(1) if m else None
-
-
 FAMELACK = "https://raw.githubusercontent.com/famelack/famelack-channels/main/tv/categories"
 
 
 def famelack():
-    """Famelack (ex tv.garden): first stream per channel, YouTube lives as country YT."""
+    """Famelack (ex tv.garden): first stream per channel (YouTube entries are left out)."""
     allc = json.loads(get(f"{FAMELACK}/all.json"))
     cat_of = {}
     for cat in CATS:
@@ -152,11 +144,6 @@ def famelack():
         if streams:
             out.append({"n": name, "c": cc, "u": streams[0], "g": bool(m.get("isGeoBlocked")),
                         "s": "Famelack", "k": cats})
-        yts = [s for s in (src.get("youtube") or []) if isinstance(s, str)]
-        if yts:
-            vid = yt_id(yts[0])
-            out.append({"n": name, "c": "YT", "u": yts[0], "s": "Famelack", "k": cats,
-                        "l": f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg" if vid else None})
     return out
 
 
@@ -228,8 +215,6 @@ def dedupe(chans):
 def check(ch):
     """'ok', 'vpn' or 'dead' - same rules as the app."""
     url = ch["u"]
-    if is_youtube(url):
-        return "ok"   # YouTube live channels are not tested
     if not url.lower().startswith(("http://", "https://")):
         return "ok"
     headers = {"User-Agent": ch.get("a") or UA}

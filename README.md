@@ -68,11 +68,11 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 ## Channel sources
 
 - iptv-org – https://github.com/iptv-org/iptv (JSON API, includes the "Geo-blocked" label)
-- Free-TV – https://github.com/Free-TV/IPTV (YouTube live channels marked Ⓨ are listed under YouTube)
-- Famelack (ex tv.garden) – https://github.com/famelack/famelack-channels (incl. many 24/7 YouTube live streams)
+- Free-TV – https://github.com/Free-TV/IPTV
+- Famelack (ex tv.garden) – https://github.com/famelack/famelack-channels
 - FreetuxTV database – https://database.freetuxtv.net (WebTV, status "Working")
 
-YouTube channels are listed as country **YouTube** (Classic) and on the **Live YT** page (TV like).
+YouTube, Twitch and Dailymotion entries cannot be played and are left out.
 **--own--** holds your own stream addresses and is always on top of the list.
 
 The channel list is saved in the app support folder (`channels.json`).

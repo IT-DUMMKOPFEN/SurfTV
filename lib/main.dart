@@ -211,7 +211,7 @@ class _HomePageState extends State<HomePage> {
         content: Text(
             'The complete list was read in: ${s.channels.length} channels.\n\n'
             'Run a quick test now? Channels that do not answer are removed '
-            '(own feeds, YouTube channels and My Channels stay). '
+            '(own feeds and My Channels stay). '
             'You can keep watching TV meanwhile.'),
         actions: [
           TextButton(

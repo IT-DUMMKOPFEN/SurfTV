@@ -13,15 +13,12 @@ class FlagIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final h = width * 0.7;
-    // Own feeds: small SlaxxTV logo. YouTube: YouTube symbol.
-    if (code == kOwnCountry || code == kYouTubeCountry) {
+    // Own feeds: small SlaxxTV logo instead of a flag.
+    if (code == kOwnCountry) {
       return SizedBox(
         width: width,
         height: h,
-        child: Image.asset(
-          code == kOwnCountry ? 'assets/own.png' : 'assets/youtube.png',
-          fit: BoxFit.contain,
-        ),
+        child: Image.asset('assets/own.png', fit: BoxFit.contain),
       );
     }
     if (code.isEmpty || code == 'XX') {

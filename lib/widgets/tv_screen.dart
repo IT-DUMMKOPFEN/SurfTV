@@ -78,7 +78,7 @@ class _TvScreenState extends State<TvScreen> {
                     fill: Colors.black,
                   ),
                   if (c == null || !s.firstFrameSeen) _startPicture(s),
-                  if (c != null && (s.buffering || s.ytResolving) && s.playError == null)
+                  if (c != null && s.buffering && s.playError == null)
                     const Center(
                         child: CircularProgressIndicator(color: Colors.white70)),
                   if (c != null && s.playError != null) _error(s),
@@ -180,6 +180,20 @@ class _TvScreenState extends State<TvScreen> {
             textAlign: TextAlign.center,
             style: const TextStyle(color: Colors.white70),
           ),
+          // The player's own message - helps to find out why.
+          if (s.playError != null && s.playError!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Text(
+                s.playError!,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+            ),
+          ],
         ]),
       ),
     );

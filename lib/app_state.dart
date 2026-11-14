@@ -13,7 +13,6 @@ import 'channel_scanner.dart';
 import 'epg.dart';
 import 'models.dart';
 import 'storage.dart';
-import 'youtube.dart';
 
 /// Channel list filter for geo-blocked channels.
 enum VpnFilter { all, noVpn, vpnOnly }
@@ -30,6 +29,7 @@ bool get isDesktop => Platform.isWindows || Platform.isLinux || Platform.isMacOS
 class AppState extends ChangeNotifier {
   AppState() {
     video = VideoController(player);
+    _configurePlayer();
     _subs.addAll([
       player.stream.buffering.listen((b) {
         buffering = b;
@@ -142,9 +142,6 @@ class AppState extends ChangeNotifier {
   static const kDefaultOwnUrl =
       'https://daserste-live.ard-mcdn.de/daserste/live/hls/de/master.m3u8';
 
-  /// True while the address of a YouTube live stream is looked up.
-  bool ytResolving = false;
-
   /// Counts finished list updates (the UI asks for a quick test then).
   final ValueNotifier<int> updateDone = ValueNotifier(0);
 
@@ -159,7 +156,6 @@ class AppState extends ChangeNotifier {
   String countryName(String code) {
     if (code == 'XX') return 'International / Unknown';
     if (code == kOwnCountry) return '--own--';
-    if (code == kYouTubeCountry) return 'YouTube';
     return countryNames[code] ?? code;
   }
 
@@ -275,7 +271,8 @@ class AppState extends ChangeNotifier {
     final ownUrls = {for (final c in ownFeeds) c.url};
     final clean = dedupeChannels([
       for (final c in db.channels)
-        if (c.source != 'own' && !ownUrls.contains(c.url)) c,
+        if (c.source != 'own' && !ownUrls.contains(c.url) && !isYouTubeUrl(c.url))
+          c,
     ]);
     _replaced = clean.replaced;
     _remapFavorites();
@@ -433,11 +430,11 @@ class AppState extends ChangeNotifier {
         }
       } else {
         final playing = current;
-        // Own feeds and YouTube channels are not tested (always kept).
+        // Own feeds are not tested (always kept).
         final keep = <String>{
           if (playing != null && (videoWidth ?? 0) > 0) playing.url,
           for (final c in channels)
-            if (c.source == 'own' || isYouTubeUrl(c.url)) c.url,
+            if (c.source == 'own') c.url,
         };
         db = await scanner.testExisting(
             List.of(channels), countryNames, (p) => jobProgress.value = p,
@@ -465,6 +462,34 @@ class AppState extends ChangeNotifier {
 
   // ================= Playback =================
 
+  /// Browser-like player settings, so streams that play in a web browser
+  /// also play here:
+  ///  * cookies from redirects are kept (some CDNs need them),
+  ///  * a browser user agent instead of "libmpv" (some servers block it),
+  ///  * no subtitle tracks (WebVTT tracks of live streams can stall the start),
+  ///  * reconnect when the connection drops.
+  static const browserUserAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+
+  Future<void> _setProp(String name, String value) async {
+    try {
+      final p = player.platform as dynamic;
+      await p.setProperty(name, value);
+    } catch (e) {
+      debugPrint('SlaxxTV: player option $name not set: $e');
+    }
+  }
+
+  Future<void> _configurePlayer() async {
+    await _setProp('cookies', 'yes');
+    await _setProp('user-agent', browserUserAgent);
+    await _setProp('sid', 'no');
+    await _setProp('network-timeout', '30');
+    await _setProp('stream-lavf-o',
+        'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5');
+  }
+
   Future<void> play(int index) async {
     if (index < 0 || index >= channels.length) return;
     currentIndex = index;
@@ -476,28 +501,10 @@ class AppState extends ChangeNotifier {
     unawaited(_prefs?.setString('lastChannel', c.url));
     lastCountry = c.countryCode;
     unawaited(_prefs?.setString('lastCountry', c.countryCode));
-    var url = c.url;
-    if (isYouTubeUrl(url)) {
-      // YouTube: look up the live stream address first.
-      ytResolving = true;
-      notifyListeners();
-      try {
-        url = await YouTubeResolver.resolve(c.url);
-      } catch (e) {
-        ytResolving = false;
-        if (currentIndex == index) {
-          await player.stop();
-          playError = e.toString().replaceFirst('Exception: ', '');
-        }
-        notifyListeners();
-        return;
-      }
-      ytResolving = false;
-      if (currentIndex != index) return; // zapped on meanwhile
-      notifyListeners();
-    }
-    await player.open(Media(url,
-        httpHeaders: isYouTubeUrl(c.url) ? const {} : c.httpHeaders));
+    // The channel's own user agent (if the list has one), else a browser one.
+    await _setProp('user-agent',
+        (c.userAgent?.isNotEmpty ?? false) ? c.userAgent! : browserUserAgent);
+    await player.open(Media(c.url, httpHeaders: c.httpHeaders));
     await player.setVolume(muted ? 0 : volume);
   }
 

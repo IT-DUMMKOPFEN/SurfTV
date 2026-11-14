@@ -4,23 +4,12 @@ library;
 /// Country code of the user's own feeds (--own--).
 const kOwnCountry = 'OWN';
 
-/// Country code of YouTube live channels.
-const kYouTubeCountry = 'YT';
-
-/// True for YouTube links (watch, embed, live, channel pages).
+/// True for YouTube links - they cannot be played and are left out.
 bool isYouTubeUrl(String url) {
   final u = url.toLowerCase();
   return u.contains('youtube.com/') ||
       u.contains('youtube-nocookie.com/') ||
       u.contains('youtu.be/');
-}
-
-/// Video id from a YouTube link, or null (e.g. for channel pages).
-String? youTubeVideoId(String url) {
-  final m = RegExp(
-          r'(?:youtu\.be/|/embed/|/live/|/shorts/|[?&]v=)([A-Za-z0-9_-]{11})')
-      .firstMatch(url);
-  return m?.group(1);
 }
 
 /// One playable TV stream.
@@ -74,10 +63,18 @@ class Channel {
   /// True if you most likely need a VPN into [countryCode] to watch it.
   bool get needsVpn => geoBlocked || vpnLikely;
 
-  Map<String, String> get httpHeaders => {
-        if (referrer != null && referrer!.isNotEmpty) 'Referer': referrer!,
-        if (userAgent != null && userAgent!.isNotEmpty) 'User-Agent': userAgent!,
-      };
+  /// Extra HTTP headers for the player. The user agent is set as player
+  /// option (see AppState.play).
+  Map<String, String> get httpHeaders {
+    final r = referrer;
+    if (r == null || r.isEmpty) return const {};
+    final u = Uri.tryParse(r);
+    return {
+      'Referer': r,
+      if (u != null && u.hasScheme && u.host.isNotEmpty)
+        'Origin': '${u.scheme}://${u.host}',
+    };
+  }
 
   Channel copyWith({bool? vpnLikely}) => Channel(
         name: name,

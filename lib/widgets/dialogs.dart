@@ -138,8 +138,6 @@ Future<void> showHelp(BuildContext context) {
                   'another device.'),
               p('Categories: Movies, Series, Docu, News and Music - pick a '
                   'category, then a country, then a channel.'),
-              p('Live YT: YouTube live channels (from Famelack and Free-TV). '
-                  'In Classic they are in the list under "YouTube".'),
               p('--own--: your own stream addresses, always on top of the '
                   'list. Add, edit or delete them in the settings or with the '
                   'edit button next to --own--.'),

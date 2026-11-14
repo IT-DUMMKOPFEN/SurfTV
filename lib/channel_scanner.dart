@@ -217,7 +217,7 @@ class ChannelScanner {
     }
     if (_cancelled) return _db([]);
 
-    // ---- 3. Famelack (ex tv.garden), incl. many YouTube live channels ----
+    // ---- 3. Famelack (ex tv.garden) ----
     try {
       onProgress(const ScanProgress(message: 'Downloading Famelack list...'));
       final all = await _getJson('${Sources.famelack}/all.json') as List;
@@ -250,19 +250,6 @@ class ChannelScanner {
             geoBlocked: m['isGeoBlocked'] == true,
             source: 'Famelack',
             categories: cats,
-          ));
-        }
-        // YouTube live channels: country "YT".
-        final yt = ((src['youtube'] as List?) ?? const []).whereType<String>();
-        if (yt.isNotEmpty && seenUrls.add(yt.first)) {
-          final id = youTubeVideoId(yt.first);
-          candidates.add(Channel(
-            name: name,
-            countryCode: kYouTubeCountry,
-            url: yt.first,
-            source: 'Famelack',
-            categories: cats,
-            logo: id == null ? null : 'https://i.ytimg.com/vi/$id/mqdefault.jpg',
           ));
         }
       }
@@ -513,12 +500,12 @@ class ChannelScanner {
       info = null;
 
       final lower = url.toLowerCase();
-      // Twitch / Dailymotion need extra tools - skipped.
-      if (lower.contains('twitch.tv') || lower.contains('dailymotion.com')) {
+      // YouTube / Twitch / Dailymotion cannot be played - skipped.
+      if (isYouTubeUrl(url) ||
+          lower.contains('twitch.tv') ||
+          lower.contains('dailymotion.com')) {
         continue;
       }
-      // YouTube live channels (marked Ⓨ): country "YT".
-      final youTube = isYouTubeUrl(url);
 
       final q = inf.lastIndexOf('",');
       var name =
@@ -529,14 +516,10 @@ class ChannelScanner {
       if (name.isEmpty) name = _attr(inf, 'tvg-name') ?? 'Unknown';
 
       final country = (_attr(inf, 'tvg-country') ?? '').toUpperCase();
-      final ytId = youTube ? youTubeVideoId(url) : null;
       out.add(Channel(
         name: name,
-        countryCode: youTube
-            ? kYouTubeCountry
-            : (country.length == 2 ? country : 'XX'),
+        countryCode: country.length == 2 ? country : 'XX',
         url: url,
-        logo: ytId == null ? null : 'https://i.ytimg.com/vi/$ytId/mqdefault.jpg',
         quality: sd ? 'SD' : null,
         geoBlocked: geo,
         source: 'Free-TV',
