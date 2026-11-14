@@ -5,7 +5,7 @@ import '../models.dart';
 import 'epg_view.dart';
 import 'flag.dart';
 
-const appVersion = '1.0';
+const appVersion = '1.1';
 
 /// Info window (also shown when the app starts).
 /// [onUpdate] shows an "Update channel list" link at the bottom left.
@@ -193,6 +193,10 @@ Future<void> showHelp(BuildContext context) {
               h('Stall detection'),
               p('When switched on in the settings, a stream whose picture '
                   'stands still for 10 seconds is restarted automatically.'),
+              h('Countries'),
+              p('Settings > Countries: click the flags of the countries you '
+                  'want to see in Discover and Categories. If none are '
+                  'selected, all countries are shown.'),
               h('Pluto TV'),
               p('Pluto TV inserts ads and logo clips into its streams. '
                   'SlaxxTV plays Pluto channels in compatibility mode and '
@@ -320,6 +324,16 @@ Future<void> showSettings(
                       onSelectionChanged: (v) => state.setVpnFilter(v.first),
                     ),
                   ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.flag_outlined),
+                  title: const Text('Countries'),
+                  subtitle: Text(state.shownCountries.isEmpty
+                      ? 'All countries are shown in Discover and Categories'
+                      : '${state.shownCountries.length} selected for Discover '
+                          'and Categories'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showCountryPicker(ctx, state),
                 ),
                 const Divider(),
                 ListTile(
@@ -648,4 +662,136 @@ class _OwnFeedsState extends State<_OwnFeeds> {
       ),
     );
   }
+}
+
+/// Settings: pick the countries shown in Discover and Categories by
+/// clicking their flags. None selected = all countries (default).
+Future<void> showCountryPicker(BuildContext context, AppState state) {
+  final codes = state.allCountryCodes;
+  final picked = {...state.shownCountries};
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setLocal) {
+        void apply() {
+          state.setShownCountries(picked);
+          setLocal(() {});
+        }
+
+        final scheme = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.flag_outlined),
+            SizedBox(width: 10),
+            Text('Countries'),
+          ]),
+          content: SizedBox(
+            width: 640,
+            height: 460,
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                      picked.isEmpty
+                          ? 'Click the flags of the countries you want to see in '
+                              'Discover and Categories. None selected = all '
+                              'countries are shown.'
+                          : '${picked.length} of ${codes.length} countries '
+                              'selected.',
+                      style: Theme.of(ctx).textTheme.bodyMedium),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: codes.isEmpty
+                        ? const Center(
+                            child: Text('No channel list yet.'))
+                        : GridView.builder(
+                            gridDelegate:
+                                const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 118,
+                              mainAxisExtent: 82,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemCount: codes.length,
+                            itemBuilder: (_, i) {
+                              final code = codes[i];
+                              final on = picked.contains(code);
+                              return Tooltip(
+                                message: state.countryName(code),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(10),
+                                  onTap: () {
+                                    on ? picked.remove(code) : picked.add(code);
+                                    apply();
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 120),
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: on
+                                          ? scheme.primaryContainer
+                                          : scheme.surfaceContainerHighest
+                                              .withValues(alpha: 0.4),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: on
+                                            ? scheme.primary
+                                            : Colors.transparent,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              FlagIcon(code, width: 44),
+                                              if (on)
+                                                Positioned(
+                                                  right: -10,
+                                                  top: -8,
+                                                  child: Icon(Icons.check_circle,
+                                                      size: 18,
+                                                      color: scheme.primary),
+                                                ),
+                                            ]),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          state.countryName(code),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(ctx)
+                                              .textTheme
+                                              .labelSmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ]),
+          ),
+          actions: [
+            TextButton(
+              onPressed: picked.isEmpty
+                  ? null
+                  : () {
+                      picked.clear();
+                      apply();
+                    },
+              child: const Text('Show all'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Done'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
 }

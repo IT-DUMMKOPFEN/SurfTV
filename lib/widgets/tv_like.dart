@@ -828,7 +828,7 @@ class _DiscoverPage extends StatelessWidget {
 }
 
 /// Header with the running TV picture at the top right
-/// (Discover, Categories). Tap = Watch Live.
+/// (Discover, My Channels, Categories). Tap = Watch Live.
 Widget _withMiniTv(BuildContext context, AppState s, Widget header,
     {required double width}) {
   // No room on small phones.
@@ -945,18 +945,26 @@ class _MyChannelsPage extends StatelessWidget {
       ),
     );
 
+    // Title + toolbar with the running TV picture at the top right.
+    Widget header(String sub) => _withMiniTv(
+        context,
+        s,
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _title(context, 'My Channels', sub: sub),
+          toolbar,
+        ]),
+        width: 128);
+
     if (my.isEmpty) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _title(context, 'My Channels', sub: '0'),
-        toolbar,
+        header('0'),
         _hint(context,
             'No favorites yet. Watch a channel and press "+ Favorite" on Live TV.'),
       ]);
     }
     if (s.myView == 2) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _title(context, 'My Channels', sub: '${my.length}'),
-        toolbar,
+        header('${my.length}'),
         Padding(
           padding: const EdgeInsets.fromLTRB(28, 10, 28, 0),
           child: Text(
@@ -969,13 +977,11 @@ class _MyChannelsPage extends StatelessWidget {
     }
     if (s.myView == 1) {
       return _pageLayout([
-        _title(context, 'My Channels', sub: '${my.length}'),
-        toolbar,
+        header('${my.length}'),
       ], (shrink) => EpgGuide(state: s, shrink: shrink));
     }
     return _pageLayout([
-      _title(context, 'My Channels', sub: '${my.length}'),
-      toolbar,
+      header('${my.length}'),
     ], (shrink) => TileGrid(
           shrink: shrink,
           itemCount: my.length,

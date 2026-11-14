@@ -5,7 +5,7 @@ SlaxxTV - one-time platform setup.
 Creates the Windows / Linux / macOS / Android project folders with
 `flutter create` and patches them for streaming:
   * Android: internet permission + plain-HTTP streams allowed, name "SlaxxTV"
-  * macOS:   network client entitlement, name "SlaxxTV"
+  * macOS:   network client + server (local proxy) entitlements, name "SlaxxTV"
   * Windows / Linux: window title "SlaxxTV"
 
 Run from the project folder:   python3 tool/setup_platforms.py
@@ -62,6 +62,11 @@ def mac_entitlements(t):
     if "com.apple.security.network.client" not in t:
         t = t.replace("</dict>",
                       "\t<key>com.apple.security.network.client</key>\n\t<true/>\n</dict>", 1)
+    # Compatibility mode (Pluto TV & co) runs a small local server on
+    # 127.0.0.1 - the macOS sandbox only allows that with this entitlement.
+    if "com.apple.security.network.server" not in t:
+        t = t.replace("</dict>",
+                      "\t<key>com.apple.security.network.server</key>\n\t<true/>\n</dict>", 1)
     # Export / import of favorites (file dialogs).
     if "com.apple.security.files.user-selected.read-write" not in t:
         t = t.replace("</dict>",

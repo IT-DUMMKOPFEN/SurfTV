@@ -265,6 +265,7 @@ class AppState extends ChangeNotifier {
       uiMode = p.getString('ui') == 'tv' ? UiMode.tvLike : UiMode.classic;
       myChannels = p.getStringList('myChannels') ?? [];
       lastCountry = p.getString('lastCountry');
+      shownCountries = (p.getStringList('shownCountries') ?? const []).toSet();
       tvTab = p.getInt('tvTab') ?? 0;
       final tc = p.getString('tvCategory');
       if (kCategories.contains(tc)) tvCategory = tc!;
@@ -624,6 +625,9 @@ class AppState extends ChangeNotifier {
   void _onStreamBreak() {
     final c = current;
     if (c == null || !_usingCompat || !isPluto(c) || _shutDown) return;
+    // Only once the picture is running - never while it is still starting
+    // (that would restart the stream again and again).
+    if ((videoWidth ?? 0) == 0 || player.state.position.inSeconds < 6) return;
     final now = DateTime.now();
     if (now.difference(_lastBreakRestart).inSeconds < 12) return;
     _lastBreakRestart = now;
@@ -729,7 +733,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The local proxy could not be started (compatibility mode off).
+  bool _proxyBroken = false;
+
   bool _canCompat(Channel c) {
+    if (_proxyBroken) return false;
     final u = c.url.toLowerCase();
     return u.startsWith('http://') || u.startsWith('https://');
   }
@@ -762,11 +770,23 @@ class AppState extends ChangeNotifier {
     await _setProp('demuxer-lavf-linearize-timestamps', isPluto(c) ? 'yes' : 'auto');
     final ua =
         (c.userAgent?.isNotEmpty ?? false) ? c.userAgent! : browserUserAgent;
+    String? proxied;
     if (compat) {
-      final url = await StreamProxy.instance
-          .url(c.url, referer: c.referrer, userAgent: ua);
-      if (current?.url != c.url) return; // zapped on meanwhile
-      await player.open(Media(url));
+      try {
+        proxied = await StreamProxy.instance
+            .url(c.url, referer: c.referrer, userAgent: ua);
+      } catch (e) {
+        // Local proxy not available (e.g. blocked by the system):
+        // play directly instead of not at all.
+        debugPrint('SlaxxTV: compatibility mode not available: $e');
+        _usingCompat = false;
+        _proxyBroken = true;
+        playStatus = null;
+      }
+    }
+    if (current?.url != c.url) return; // zapped on meanwhile
+    if (proxied != null) {
+      await player.open(Media(proxied));
     } else {
       await _setProp('user-agent', ua);
       await player.open(Media(c.url, httpHeaders: c.httpHeaders));
@@ -1101,6 +1121,11 @@ class AppState extends ChangeNotifier {
         set.add(c.countryCode);
       }
     }
+    // Countries chosen in the settings (none chosen = all). Own feeds
+    // always stay.
+    if (shownCountries.isNotEmpty) {
+      set.removeWhere((c) => c != kOwnCountry && !shownCountries.contains(c));
+    }
     final list = set.toList()
       ..sort((a, b) {
         if (a == kOwnCountry) return -1;
@@ -1110,6 +1135,27 @@ class AppState extends ChangeNotifier {
         return countryName(a).compareTo(countryName(b));
       });
     return list;
+  }
+
+  /// Countries shown in Discover and Categories (empty = all).
+  Set<String> shownCountries = {};
+
+  /// All countries in the channel list, for the settings (sorted by name).
+  List<String> get allCountryCodes {
+    final set = {for (final c in channels) c.countryCode}..remove(kOwnCountry);
+    return set.toList()
+      ..sort((a, b) {
+        if (a == 'XX') return 1;
+        if (b == 'XX') return -1;
+        return countryName(a).compareTo(countryName(b));
+      });
+  }
+
+  void setShownCountries(Set<String> codes) {
+    shownCountries = {...codes};
+    _prefs?.setStringList('shownCountries', shownCountries.toList());
+    _countryCache.clear();
+    notifyListeners();
   }
 
   /// True while only the picture is shown (fullscreen or Watch Live).

@@ -1,4 +1,4 @@
-# SlaxxTV 1.0
+# SlaxxTV 1.1
 
 Watch free-to-air internet TV channels from all over the world.
 Windows · Linux · macOS · Android
@@ -33,7 +33,7 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 - The last selection is always shown in the middle again
 - Settings, English help and info page
 - **Program guide** for the channels in My Channels (now / next on Live TV, tiles, remote display; full guide on the My Channels page or with **G**). Source: [epgshare01](https://epgshare01.online/epgshare01/) – not every channel has guide data
-- **+ button** on channel tiles in Discover and Categories adds a channel to My Channels; the running picture is shown small at the top right
+- **+ button** on channel tiles in Discover and Categories adds a channel to My Channels; the running picture is shown small at the top right (Discover, My Channels, Categories)
 - **Quality button** next to the fullscreen button: pick the quality of the running stream (remembered per channel); buttons hide after a few seconds in fullscreen / Watch Live
 - **Stall detection** (settings, off by default): restarts a stream whose picture stands still
 - **Pluto TV:** played in compatibility mode with a clean restart after each ad / logo break (no stutter afterwards)
@@ -53,6 +53,7 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 - Channel search: downloads the public lists and tests every stream, like the channel search on a TV. It shows a live counter with channel name and country. **Stop** keeps the channels found so far.
 - VPN hint: channels marked *geo-blocked* in the lists, or that answered "access denied" during the search
 - VPN filter: **All / No VPN / VPN only**
+- **Countries** (settings): click the flags of the countries shown in Discover and Categories – none selected = all
 - Categories: **Movies, Series, Docu, News, Music** – all countries with their channels of that kind
 - **Update** reads in the complete newest channel lists (all channels); **Test** then keeps only the working ones
 - **Test my channels** (Quick or Intensive): streams that do not answer are removed from the list. Runs in the background – TV keeps playing
@@ -118,7 +119,7 @@ sudo apt install libmpv-dev mpv      # Debian / Ubuntu
 ### Notes
 
 - Android needs plain-HTTP streams allowed. The setup script sets `usesCleartextTraffic` and the internet permission.
-- macOS needs the network client entitlement. The setup script adds it.
+- macOS needs the network client and network server entitlements (the server one for the local compatibility proxy). The setup script adds them.
 - Flags are loaded from flagcdn.com, because Windows cannot show flag emojis.
 
 ## Project structure
