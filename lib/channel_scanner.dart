@@ -433,38 +433,102 @@ class ChannelScanner {
     return found;
   }
 
-  /// Opens the stream and waits for the first bytes.
+  /// Opens the stream like the player does: the address, and for HLS
+  /// playlists also the first variant and the first video segment.
+  /// Redirects are followed by hand so cookies are kept (like the
+  /// compatibility mode of the player).
   Future<_Result> _check(HttpClient client, Channel c, _Timing t) async {
-    HttpClientRequest? req;
     try {
       final uri = Uri.parse(c.url);
       if (uri.scheme != 'http' && uri.scheme != 'https') {
         // rtmp/rtsp etc. cannot be tested with HTTP - let the player try.
         return _Result.ok;
       }
-      req = await client.getUrl(uri).timeout(t.connect);
+      final cookies = <String, String>{};
+      var r = await _get(client, uri, c, t, cookies);
+      if (r.code == 401 || r.code == 403 || r.code == 451) return _Result.vpn;
+      if (r.code < 200 || r.code >= 400 || r.data.isEmpty) return _Result.dead;
+      // HLS: follow master playlist -> media playlist -> segment.
+      for (var depth = 0; depth < 3; depth++) {
+        final text = utf8.decode(r.data, allowMalformed: true);
+        if (!text.trimLeft().startsWith('#EXTM3U')) return _Result.ok;
+        final next = _firstUri(text);
+        if (next == null) return _Result.ok; // playlist still loading
+        r = await _get(client, r.finalUri.resolve(next), c, t, cookies);
+        if (r.code == 401 || r.code == 403 || r.code == 451) return _Result.vpn;
+        if (r.code < 200 || r.code >= 400 || r.data.isEmpty) return _Result.dead;
+      }
+      return _Result.ok;
+    } catch (_) {
+      return _Result.dead;
+    }
+  }
+
+  /// First variant / segment address of an HLS playlist.
+  static String? _firstUri(String playlist) {
+    for (final line in const LineSplitter().convert(playlist)) {
+      final l = line.trim();
+      if (l.isNotEmpty && !l.startsWith('#')) return l;
+    }
+    return null;
+  }
+
+  /// GET with redirects by hand; returns status, the first data chunk
+  /// (up to ~64 KB for playlists) and the final address.
+  Future<({int code, List<int> data, Uri finalUri})> _get(HttpClient client,
+      Uri uri, Channel c, _Timing t, Map<String, String> cookies) async {
+    var current = uri;
+    for (var i = 0; i < 8; i++) {
+      final req = await client.getUrl(current).timeout(t.connect);
+      req.followRedirects = false;
       req.headers.set(HttpHeaders.userAgentHeader,
           (c.userAgent?.isNotEmpty ?? false) ? c.userAgent! : _defaultUserAgent);
       if (c.referrer?.isNotEmpty ?? false) {
         req.headers.set('Referer', c.referrer!);
       }
+      if (cookies.isNotEmpty) {
+        req.headers.set(HttpHeaders.cookieHeader,
+            cookies.entries.map((e) => '${e.key}=${e.value}').join('; '));
+      }
       final res = await req.close().timeout(t.response);
-      final code = res.statusCode;
-      if (code == 401 || code == 403 || code == 451) {
+      try {
+        for (final k in res.cookies) {
+          cookies[k.name] = k.value;
+        }
+      } catch (_) {}
+      final loc = res.headers.value(HttpHeaders.locationHeader);
+      if (res.isRedirect && loc != null) {
         unawaited(res.drain<void>().catchError((_) {}));
-        return _Result.vpn;
+        current = current.resolve(loc);
+        continue;
       }
-      if (code < 200 || code >= 400) {
+      if (res.statusCode >= 400) {
         unawaited(res.drain<void>().catchError((_) {}));
-        return _Result.dead;
+        return (code: res.statusCode, data: const <int>[], finalUri: current);
       }
-      // Some data must arrive, otherwise the stream is dead.
-      final first = await res.first.timeout(t.data);
-      return first.isEmpty ? _Result.dead : _Result.ok;
-    } catch (_) {
-      req?.abort();
-      return _Result.dead;
+      // Read a little (enough for a playlist), then stop.
+      final data = <int>[];
+      final done = Completer<void>();
+      late StreamSubscription<List<int>> sub;
+      sub = res.listen((chunk) {
+        data.addAll(chunk);
+        if (data.length > 65536) {
+          sub.cancel();
+          if (!done.isCompleted) done.complete();
+        }
+      }, onDone: () {
+        if (!done.isCompleted) done.complete();
+      }, onError: (_) {
+        if (!done.isCompleted) done.complete();
+      }, cancelOnError: true);
+      try {
+        await done.future.timeout(t.data);
+      } catch (_) {
+        await sub.cancel();
+      }
+      return (code: res.statusCode, data: data, finalUri: current);
     }
+    return (code: 310, data: const <int>[], finalUri: current);
   }
 
   static Future<dynamic> _getJson(String url) async {

@@ -5,7 +5,7 @@ import '../models.dart';
 import 'epg_view.dart';
 import 'flag.dart';
 
-const appVersion = '0.7b';
+const appVersion = '0.8b';
 
 /// Info window (also shown when the app starts).
 /// [onUpdate] shows an "Update channel list" link at the bottom left.
@@ -161,6 +161,13 @@ Future<void> showHelp(BuildContext context) {
                   'that do not answer. Quick: streams must answer fast. '
                   'Intensive: streams get more time. Both run in the '
                   'background - you can keep watching TV.'),
+              h('Compatibility mode'),
+              p('Some streams play in a web browser but not in the player '
+                  '(e.g. "tcp: ffurl_read returned ..."). Then SlaxxTV '
+                  'switches to the compatibility mode by itself: the app '
+                  'loads the stream like a browser and passes it on to the '
+                  'player. Such channels are remembered and start in this '
+                  'mode next time.'),
               h('Keyboard'),
               key('F1', 'Switch Classic / TV like'),
               key('F / F11', 'Fullscreen (whole monitor)'),

@@ -13,6 +13,7 @@ import 'channel_scanner.dart';
 import 'epg.dart';
 import 'models.dart';
 import 'storage.dart';
+import 'stream_proxy.dart';
 
 /// Channel list filter for geo-blocked channels.
 enum VpnFilter { all, noVpn, vpnOnly }
@@ -37,6 +38,8 @@ class AppState extends ChangeNotifier {
       }),
       player.stream.error.listen((e) {
         if ((videoWidth ?? 0) == 0) {
+          // Direct playback failed: try the compatibility mode first.
+          if (_tryCompatibility()) return;
           playError = e;
           notifyListeners();
         }
@@ -45,7 +48,9 @@ class AppState extends ChangeNotifier {
         videoWidth = w;
         if ((w ?? 0) > 0) {
           playError = null;
+          playStatus = null;
           firstFrameSeen = true;
+          _watchdog?.cancel();
         }
         notifyListeners();
       }),
@@ -191,6 +196,7 @@ class AppState extends ChangeNotifier {
       muted = p.getBool('muted') ?? false;
       themeMode =
           (p.getString('theme') == 'light') ? ThemeMode.light : ThemeMode.dark;
+      _compatUrls.addAll(p.getStringList('compatUrls') ?? const []);
       final own = p.getString('ownFeeds');
       ownFeeds = own == null
           ? [_ownChannel('Das Erste', kDefaultOwnUrl)]
@@ -485,9 +491,65 @@ class AppState extends ChangeNotifier {
     await _setProp('cookies', 'yes');
     await _setProp('user-agent', browserUserAgent);
     await _setProp('sid', 'no');
-    await _setProp('network-timeout', '30');
-    await _setProp('stream-lavf-o',
-        'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5');
+    // Give up a dead connection after 12 s (then compatibility mode).
+    await _setProp('network-timeout', '12');
+    // A new connection for every HLS segment: persistent connections are a
+    // known cause of "tcp: ffurl_read returned ..." stalls.
+    await _setProp('demuxer-lavf-o', 'http_persistent=0');
+  }
+
+  // ---- Compatibility mode (stream goes through StreamProxy) ----
+
+  /// Channels that only play in compatibility mode (remembered).
+  final Set<String> _compatUrls = {};
+  bool _usingCompat = false;
+  Timer? _watchdog;
+
+  /// Shown under the spinner, e.g. "Compatibility mode...".
+  String? playStatus;
+
+  bool _canCompat(Channel c) {
+    final u = c.url.toLowerCase();
+    return u.startsWith('http://') || u.startsWith('https://');
+  }
+
+  /// Switches the running channel to compatibility mode (once).
+  bool _tryCompatibility() {
+    final c = current;
+    if (c == null || _usingCompat || !_canCompat(c)) return false;
+    _compatUrls.add(c.url);
+    _prefs?.setStringList('compatUrls', _compatUrls.take(2000).toList());
+    unawaited(_open(c, compat: true));
+    return true;
+  }
+
+  Future<void> _open(Channel c, {required bool compat}) async {
+    _usingCompat = compat;
+    playStatus = compat ? 'Compatibility mode...' : null;
+    playError = null;
+    notifyListeners();
+    final ua =
+        (c.userAgent?.isNotEmpty ?? false) ? c.userAgent! : browserUserAgent;
+    if (compat) {
+      final url = await StreamProxy.instance
+          .url(c.url, referer: c.referrer, userAgent: ua);
+      if (current?.url != c.url) return; // zapped on meanwhile
+      await player.open(Media(url));
+    } else {
+      await _setProp('user-agent', ua);
+      await player.open(Media(c.url, httpHeaders: c.httpHeaders));
+    }
+    await player.setVolume(muted ? 0 : volume);
+    // No picture after 15 s (and no error)? Try the other way.
+    _watchdog?.cancel();
+    _watchdog = Timer(const Duration(seconds: 15), () {
+      if (current?.url == c.url && (videoWidth ?? 0) == 0 && playError == null) {
+        if (!_tryCompatibility() && _usingCompat) {
+          playError = 'No picture from this channel (timeout).';
+          notifyListeners();
+        }
+      }
+    });
   }
 
   Future<void> play(int index) async {
@@ -501,11 +563,8 @@ class AppState extends ChangeNotifier {
     unawaited(_prefs?.setString('lastChannel', c.url));
     lastCountry = c.countryCode;
     unawaited(_prefs?.setString('lastCountry', c.countryCode));
-    // The channel's own user agent (if the list has one), else a browser one.
-    await _setProp('user-agent',
-        (c.userAgent?.isNotEmpty ?? false) ? c.userAgent! : browserUserAgent);
-    await player.open(Media(c.url, httpHeaders: c.httpHeaders));
-    await player.setVolume(muted ? 0 : volume);
+    // Channels known to need it start in compatibility mode right away.
+    await _open(c, compat: _compatUrls.contains(c.url) && _canCompat(c));
   }
 
   // ================= Own feeds (--own--) =================
@@ -860,6 +919,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _scanner?.cancel();
+    _watchdog?.cancel();
     _clock?.cancel();
     _epgDebounce?.cancel();
     jobProgress.dispose();

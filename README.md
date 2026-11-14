@@ -1,4 +1,4 @@
-# SlaxxTV 0.7b
+# SlaxxTV 0.8b
 
 Watch free-to-air internet TV channels from all over the world.
 Windows · Linux · macOS · Android
@@ -74,6 +74,8 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 
 YouTube, Twitch and Dailymotion entries cannot be played and are left out.
 **--own--** holds your own stream addresses and is always on top of the list.
+
+**Compatibility mode:** streams that play in a browser but not in the player (e.g. `tcp: ffurl_read returned ...`) are switched automatically to a built-in local proxy that loads the stream with the app's own network stack (cookies on redirects, browser-like requests, HLS playlists rewritten). Such channels are remembered. The channel test checks HLS streams down to the first video segment in the same way.
 
 The channel list is saved in the app support folder (`channels.json`).
 Settings and the keys 0–9 are saved with shared_preferences.

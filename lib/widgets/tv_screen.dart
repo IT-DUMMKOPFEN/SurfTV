@@ -78,9 +78,19 @@ class _TvScreenState extends State<TvScreen> {
                     fill: Colors.black,
                   ),
                   if (c == null || !s.firstFrameSeen) _startPicture(s),
-                  if (c != null && s.buffering && s.playError == null)
-                    const Center(
-                        child: CircularProgressIndicator(color: Colors.white70)),
+                  if (c != null &&
+                      (s.buffering || s.playStatus != null) &&
+                      s.playError == null)
+                    Center(
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        const CircularProgressIndicator(color: Colors.white70),
+                        if (s.playStatus != null) ...[
+                          const SizedBox(height: 10),
+                          Text(s.playStatus!,
+                              style: const TextStyle(color: Colors.white70)),
+                        ],
+                      ]),
+                    ),
                   if (c != null && s.playError != null) _error(s),
                   if (c != null)
                     Positioned(
