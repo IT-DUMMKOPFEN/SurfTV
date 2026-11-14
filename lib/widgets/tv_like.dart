@@ -848,7 +848,6 @@ Widget _withMiniTv(BuildContext context, AppState s, Widget header,
             decoration: BoxDecoration(
               color: Colors.black,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kAccent, width: 2),
             ),
             child: TvScreen(state: s, compact: true),
           ),

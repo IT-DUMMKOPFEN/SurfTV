@@ -180,6 +180,11 @@ Future<void> showHelp(BuildContext context) {
                   'that do not answer. Quick: streams must answer fast. '
                   'Intensive: streams get more time. Both run in the '
                   'background - you can keep watching TV.'),
+              h('Buffering'),
+              p('SlaxxTV loads some seconds of a stream ahead before it '
+                  'starts playing ("Buffering" in the picture). This helps '
+                  'with streams that have short dropouts. Switch it off or '
+                  'change the seconds in the settings.'),
               h('Compatibility mode'),
               p('Some streams play in a web browser but not in the player '
                   '(e.g. "tcp: ffurl_read returned ..."). Then SlaxxTV '
@@ -248,6 +253,33 @@ Future<void> showSettings(
                   value: state.themeMode == ThemeMode.dark,
                   onChanged: (_) => state.toggleTheme(),
                 ),
+                const Divider(),
+                SwitchListTile(
+                  secondary: const Icon(Icons.hourglass_bottom),
+                  title: const Text('Buffering'),
+                  subtitle: const Text('Load some seconds ahead before playing - '
+                      'smoother playback for streams with short dropouts'),
+                  value: state.bufferEnabled,
+                  onChanged: (v) => state.setBuffering(enabled: v),
+                ),
+                if (state.bufferEnabled)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(72, 0, 16, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: SegmentedButton<int>(
+                        showSelectedIcon: false,
+                        segments: const [
+                          ButtonSegment(value: 3, label: Text('3 s')),
+                          ButtonSegment(value: 5, label: Text('5 s')),
+                          ButtonSegment(value: 10, label: Text('10 s')),
+                        ],
+                        selected: {state.bufferSeconds},
+                        onSelectionChanged: (v) =>
+                            state.setBuffering(seconds: v.first),
+                      ),
+                    ),
+                  ),
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.vpn_lock),

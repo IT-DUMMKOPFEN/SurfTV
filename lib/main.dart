@@ -1,7 +1,7 @@
 // SlaxxTV - free internet TV from all over the world.
 // Written by IT-Dummkopfen with the help of an AI.
 
-import 'dart:ui' show PointerDeviceKind;
+import 'dart:ui' show AppExitResponse, PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -106,6 +106,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onHardwareKey);
+    _lifecycle.dispose();
     s.updateDone.removeListener(_askQuickTest);
     _focus.dispose();
     super.dispose();
@@ -186,9 +187,19 @@ class _HomePageState extends State<HomePage> {
     return b >= 0 ? b : null;
   }
 
+  /// Quit (window closed, Cmd+Q, Alt+F4): stop the player first.
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(
+    onExitRequested: () async {
+      await s.shutdown();
+      return AppExitResponse.exit;
+    },
+    onDetach: () => s.shutdown(),
+  );
+
   @override
   void initState() {
     super.initState();
+    _lifecycle; // start listening
     HardwareKeyboard.instance.addHandler(_onHardwareKey);
     s.updateDone.addListener(_askQuickTest);
     // Show the info window when the app starts.

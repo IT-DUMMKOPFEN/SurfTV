@@ -33,6 +33,7 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 - Settings, English help and info page
 - **Program guide** for the channels in My Channels (now / next on Live TV, tiles, remote display; full guide on the My Channels page or with **G**). Source: [epgshare01](https://epgshare01.online/epgshare01/) – not every channel has guide data
 - **+ button** on channel tiles in Discover and Categories adds a channel to My Channels; the running picture is shown small at the top right
+- **Buffering:** a few seconds are loaded ahead ("Buffering" in the picture) for smoother playback; on/off and 3/5/10 s in the settings
 - **Sort My Channels** with drag & drop (mouse or finger)
 - **Export / Import** of My Channels and the keys 0–9 as a JSON file
 

@@ -88,10 +88,15 @@ class _TvScreenState extends State<TvScreen> {
                     Center(
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                         const CircularProgressIndicator(color: Colors.white70),
-                        if (s.playStatus != null && !widget.compact) ...[
+                        if (!widget.compact) ...[
                           const SizedBox(height: 10),
-                          Text(s.playStatus!,
-                              style: const TextStyle(color: Colors.white70)),
+                          Text(
+                              s.playStatus ??
+                                  (s.bufferEnabled
+                                      ? 'Buffering (${s.bufferSeconds} s)...'
+                                      : 'Buffering...'),
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 16)),
                         ],
                       ]),
                     ),

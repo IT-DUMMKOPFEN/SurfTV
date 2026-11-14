@@ -212,6 +212,8 @@ class AppState extends ChangeNotifier {
       themeMode =
           (p.getString('theme') == 'light') ? ThemeMode.light : ThemeMode.dark;
       _compatUrls.addAll(p.getStringList('compatUrls') ?? const []);
+      bufferEnabled = p.getBool('bufferEnabled') ?? true;
+      bufferSeconds = p.getInt('bufferSeconds') ?? 5;
       final own = p.getString('ownFeeds');
       ownFeeds = own == null
           ? [_ownChannel('Das Erste', kDefaultOwnUrl)]
@@ -242,6 +244,7 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
     unawaited(player.setVolume(muted ? 0 : volume));
+    unawaited(_applyBuffering());
 
     // Saved list (from the last channel search) or the list shipped with
     // the app - whichever is newer.
@@ -519,6 +522,57 @@ class AppState extends ChangeNotifier {
   final Set<String> _compatUrls = {};
   bool _usingCompat = false;
   Timer? _watchdog;
+
+  // ---- Buffering (preload some seconds before playing) ----
+
+  /// Preload before the picture starts and after short dropouts.
+  bool bufferEnabled = true;
+
+  /// Seconds that are loaded ahead.
+  int bufferSeconds = 5;
+
+  Future<void> _applyBuffering() async {
+    if (bufferEnabled) {
+      await _setProp('cache', 'yes');
+      await _setProp('cache-pause', 'yes');
+      await _setProp('cache-pause-initial', 'yes');
+      await _setProp('cache-pause-wait', '$bufferSeconds');
+      await _setProp('demuxer-readahead-secs', '${bufferSeconds + 10}');
+      await _setProp('cache-secs', '${bufferSeconds + 30}');
+    } else {
+      await _setProp('cache-pause-initial', 'no');
+      await _setProp('cache-pause-wait', '1');
+      await _setProp('demuxer-readahead-secs', '1');
+    }
+  }
+
+  void setBuffering({bool? enabled, int? seconds}) {
+    if (enabled != null) bufferEnabled = enabled;
+    if (seconds != null) bufferSeconds = seconds;
+    _prefs?.setBool('bufferEnabled', bufferEnabled);
+    _prefs?.setInt('bufferSeconds', bufferSeconds);
+    unawaited(_applyBuffering());
+    notifyListeners();
+  }
+
+  /// Stops the player cleanly before the app quits. Without this, the
+  /// player could still send events while the app shuts down
+  /// (crash "abort() called" in "mpv core" on macOS).
+  bool _shutDown = false;
+  Future<void> shutdown() async {
+    if (_shutDown) return;
+    _shutDown = true;
+    _watchdog?.cancel();
+    _scanner?.cancel();
+    for (final s in _subs) {
+      await s.cancel();
+    }
+    _subs.clear();
+    try {
+      await player.stop();
+      await player.dispose();
+    } catch (_) {}
+  }
 
   /// Shown under the spinner, e.g. "Compatibility mode...".
   String? playStatus;
@@ -939,10 +993,12 @@ class AppState extends ChangeNotifier {
     _epgDebounce?.cancel();
     jobProgress.dispose();
     updateDone.dispose();
-    for (final s in _subs) {
-      s.cancel();
+    if (!_shutDown) {
+      for (final s in _subs) {
+        s.cancel();
+      }
+      player.dispose();
     }
-    player.dispose();
     super.dispose();
   }
 }
