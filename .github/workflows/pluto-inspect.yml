@@ -1,0 +1,9 @@
+name: Pluto inspect
+on:
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tool/pluto_inspect.py
