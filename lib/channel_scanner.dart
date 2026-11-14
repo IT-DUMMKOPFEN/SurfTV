@@ -12,9 +12,17 @@ class Sources {
   static const iptvOrgApi = 'https://iptv-org.github.io/api';
   static const freeTv =
       'https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8';
+  static const famelack =
+      'https://raw.githubusercontent.com/famelack/famelack-channels/main/tv/categories';
+
+  /// FreetuxTV database: WebTV (type 1) with status "Working" (2).
+  static String freetuxtv(int page) =>
+      'https://database.freetuxtv.net/WebStream/index'
+      '?WebStreamSearchForm%5BType%5D=1&WebStreamSearchForm%5BStatus%5D=2'
+      '${page > 1 ? '&WebStream_page=$page' : ''}';
 }
 
-/// Categories SurfTV offers as filters (iptv-org category ids).
+/// Categories SlaxxTV offers as filters (iptv-org category ids).
 const kCategories = ['movies', 'series', 'documentary', 'news', 'music'];
 
 /// How long streams may take to answer.
@@ -206,6 +214,79 @@ class ChannelScanner {
       sourcesOk++;
     } catch (_) {
       // Ignore - iptv-org alone is fine.
+    }
+    if (_cancelled) return _db([]);
+
+    // ---- 3. Famelack (ex tv.garden), incl. many YouTube live channels ----
+    try {
+      onProgress(const ScanProgress(message: 'Downloading Famelack list...'));
+      final all = await _getJson('${Sources.famelack}/all.json') as List;
+      // Categories come from extra files (by channel id).
+      final catOf = <String, Set<String>>{};
+      for (final cat in kCategories) {
+        try {
+          final list = await _getJson('${Sources.famelack}/$cat.json') as List;
+          for (final e in list) {
+            final id = (e as Map)['nanoid'] as String?;
+            if (id != null) catOf.putIfAbsent(id, () => {}).add(cat);
+          }
+        } catch (_) {}
+      }
+      for (final e in all) {
+        final m = e as Map<String, dynamic>;
+        final name = (m['name'] as String?)?.trim() ?? 'Unknown';
+        var cc = ((m['country'] as String?) ?? '').toUpperCase();
+        if (cc == 'GB') cc = 'UK';
+        if (cc.length != 2) cc = 'XX';
+        final src = (m['sources'] as Map?) ?? const {};
+        final cats = (catOf[m['nanoid']] ?? const <String>{}).toList();
+        // Only the first stream of a channel - the others are backups.
+        final streams = ((src['streams'] as List?) ?? const []).whereType<String>();
+        if (streams.isNotEmpty && seenUrls.add(streams.first)) {
+          candidates.add(Channel(
+            name: name,
+            countryCode: cc,
+            url: streams.first,
+            geoBlocked: m['isGeoBlocked'] == true,
+            source: 'Famelack',
+            categories: cats,
+          ));
+        }
+        // YouTube live channels: country "YT".
+        final yt = ((src['youtube'] as List?) ?? const []).whereType<String>();
+        if (yt.isNotEmpty && seenUrls.add(yt.first)) {
+          final id = youTubeVideoId(yt.first);
+          candidates.add(Channel(
+            name: name,
+            countryCode: kYouTubeCountry,
+            url: yt.first,
+            source: 'Famelack',
+            categories: cats,
+            logo: id == null ? null : 'https://i.ytimg.com/vi/$id/mqdefault.jpg',
+          ));
+        }
+      }
+      sourcesOk++;
+    } catch (_) {
+      // Ignore.
+    }
+    if (_cancelled) return _db([]);
+
+    // ---- 4. FreetuxTV database (WebTV, status "Working") ----
+    try {
+      for (var page = 1; page <= 60 && !_cancelled; page++) {
+        onProgress(ScanProgress(
+            message: 'Downloading FreetuxTV list (page $page)...'));
+        final html = await _getText(Sources.freetuxtv(page));
+        final rows = parseFreetuxtv(html);
+        for (final c in rows) {
+          if (seenUrls.add(c.url)) candidates.add(c);
+        }
+        if (rows.isEmpty || !html.contains('WebStream_page=${page + 1}')) break;
+      }
+      sourcesOk++;
+    } catch (_) {
+      // Ignore.
     }
 
     if (sourcesOk == 0) {
@@ -432,12 +513,12 @@ class ChannelScanner {
       info = null;
 
       final lower = url.toLowerCase();
-      if (lower.contains('youtube.com') ||
-          lower.contains('youtu.be') ||
-          lower.contains('twitch.tv') ||
-          lower.contains('dailymotion.com')) {
+      // Twitch / Dailymotion need extra tools - skipped.
+      if (lower.contains('twitch.tv') || lower.contains('dailymotion.com')) {
         continue;
       }
+      // YouTube live channels (marked Ⓨ): country "YT".
+      final youTube = isYouTubeUrl(url);
 
       final q = inf.lastIndexOf('",');
       var name =
@@ -448,10 +529,14 @@ class ChannelScanner {
       if (name.isEmpty) name = _attr(inf, 'tvg-name') ?? 'Unknown';
 
       final country = (_attr(inf, 'tvg-country') ?? '').toUpperCase();
+      final ytId = youTube ? youTubeVideoId(url) : null;
       out.add(Channel(
         name: name,
-        countryCode: country.length == 2 ? country : 'XX',
+        countryCode: youTube
+            ? kYouTubeCountry
+            : (country.length == 2 ? country : 'XX'),
         url: url,
+        logo: ytId == null ? null : 'https://i.ytimg.com/vi/$ytId/mqdefault.jpg',
         quality: sd ? 'SD' : null,
         geoBlocked: geo,
         source: 'Free-TV',
@@ -460,6 +545,45 @@ class ChannelScanner {
     }
     return out;
   }
+
+  /// Rows of a FreetuxTV result page: name, stream address (after "=>")
+  /// and the country code (alt text of the country flag).
+  static List<Channel> parseFreetuxtv(String html) {
+    final out = <Channel>[];
+    final tdRe = RegExp(r'<td[^>]*>(.*?)</td>', dotAll: true);
+    for (final row in html.split(RegExp(r'<tr[\s>]')).skip(1)) {
+      final tds = tdRe.allMatches(row).map((m) => m.group(1)!).toList();
+      if (tds.length < 3) continue;
+      final first = tds[0];
+      final url = RegExp(r'href="((?:https?|rtmp|rtsp|mms)://[^"]+)"')
+          .allMatches(first)
+          .map((m) => _unescapeHtml(m.group(1)!))
+          .where((u) => !u.contains('freetuxtv.net'))
+          .firstOrNull;
+      if (url == null) continue;
+      final nameHtml = first.split(RegExp(r'<br\s*/?>|=&gt;|=>')).first;
+      final name =
+          _unescapeHtml(nameHtml.replaceAll(RegExp(r'<[^>]*>'), '')).trim();
+      var cc = (RegExp(r'alt="([^"]*)"').firstMatch(tds[2])?.group(1) ?? '')
+          .trim()
+          .toUpperCase();
+      if (cc == 'GB') cc = 'UK';
+      out.add(Channel(
+        name: name.isEmpty ? url : name,
+        countryCode: cc.length == 2 ? cc : 'XX',
+        url: url,
+        source: 'FreetuxTV',
+      ));
+    }
+    return out;
+  }
+
+  static String _unescapeHtml(String s) => s
+      .replaceAll('&amp;', '&')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#039;', "'");
 
   static String? _attr(String info, String key) {
     final m = RegExp('$key="([^"]*)"').firstMatch(info);

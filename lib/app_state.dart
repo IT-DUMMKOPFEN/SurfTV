@@ -13,6 +13,7 @@ import 'channel_scanner.dart';
 import 'epg.dart';
 import 'models.dart';
 import 'storage.dart';
+import 'youtube.dart';
 
 /// Channel list filter for geo-blocked channels.
 enum VpnFilter { all, noVpn, vpnOnly }
@@ -25,7 +26,7 @@ enum JobKind { update, test }
 
 bool get isDesktop => Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
-/// Central state of SurfTV: channels, player, favorites, settings.
+/// Central state of SlaxxTV: channels, player, favorites, settings.
 class AppState extends ChangeNotifier {
   AppState() {
     video = VideoController(player);
@@ -136,6 +137,17 @@ class AppState extends ChangeNotifier {
   Timer? _clock;
   Timer? _epgDebounce;
 
+  /// The user's own feeds (--own--), always on top of the list.
+  List<Channel> ownFeeds = [];
+  static const kDefaultOwnUrl =
+      'https://daserste-live.ard-mcdn.de/daserste/live/hls/de/master.m3u8';
+
+  /// True while the address of a YouTube live stream is looked up.
+  bool ytResolving = false;
+
+  /// Counts finished list updates (the UI asks for a quick test then).
+  final ValueNotifier<int> updateDone = ValueNotifier(0);
+
   /// Channel URLs stored on the remote keys 0..9.
   List<String?> favorites = List.filled(10, null);
 
@@ -146,6 +158,8 @@ class AppState extends ChangeNotifier {
 
   String countryName(String code) {
     if (code == 'XX') return 'International / Unknown';
+    if (code == kOwnCountry) return '--own--';
+    if (code == kYouTubeCountry) return 'YouTube';
     return countryNames[code] ?? code;
   }
 
@@ -181,6 +195,13 @@ class AppState extends ChangeNotifier {
       muted = p.getBool('muted') ?? false;
       themeMode =
           (p.getString('theme') == 'light') ? ThemeMode.light : ThemeMode.dark;
+      final own = p.getString('ownFeeds');
+      ownFeeds = own == null
+          ? [_ownChannel('Das Erste', kDefaultOwnUrl)]
+          : [
+              for (final e in jsonDecode(own) as List)
+                _ownChannel((e as Map)['n'] as String, e['u'] as String),
+            ];
       final fav = p.getString('favorites');
       if (fav != null) {
         final list = (jsonDecode(fav) as List).cast<String?>();
@@ -200,7 +221,7 @@ class AppState extends ChangeNotifier {
       final cat = p.getString('category');
       category = kCategories.contains(cat) ? cat : null;
     } catch (e) {
-      debugPrint('SurfTV: settings not loaded: $e');
+      debugPrint('SlaxxTV: settings not loaded: $e');
     }
     notifyListeners();
     unawaited(player.setVolume(muted ? 0 : volume));
@@ -217,7 +238,10 @@ class AppState extends ChangeNotifier {
             shipped.updated.isAfter(db.updated))) {
       db = shipped;
     }
-    if (db != null) _setDb(db);
+    // Also without a list: the own feeds are shown.
+    _setDb(db ??
+        ChannelDb(channels: const [], countryNames: const {}, updated: DateTime.now()));
+    if (db == null) listUpdated = null;
     loading = false;
     notifyListeners();
 
@@ -249,9 +273,13 @@ class AppState extends ChangeNotifier {
     final clean = dedupeChannels(db.channels);
     _replaced = clean.replaced;
     _remapFavorites();
-    final list = List<Channel>.from(clean.channels);
+    final list = <Channel>[
+      ...clean.channels.where((c) => c.source != 'own'),
+      ...ownFeeds,
+    ];
+    // --own-- always on top, "International / Unknown" at the end.
     String key(Channel c) =>
-        '${c.countryCode == 'XX' ? '~' : countryName(c.countryCode).toLowerCase()}'
+        '${c.countryCode == kOwnCountry ? '\u0000' : c.countryCode == 'XX' ? '~' : countryName(c.countryCode).toLowerCase()}'
         '|${c.name.toLowerCase()}';
     list.sort((a, b) => key(a).compareTo(key(b)));
     channels = list;
@@ -399,8 +427,11 @@ class AppState extends ChangeNotifier {
         }
       } else {
         final playing = current;
+        // Own feeds and YouTube channels are not tested (always kept).
         final keep = <String>{
           if (playing != null && (videoWidth ?? 0) > 0) playing.url,
+          for (final c in channels)
+            if (c.source == 'own' || isYouTubeUrl(c.url)) c.url,
         };
         db = await scanner.testExisting(
             List.of(channels), countryNames, (p) => jobProgress.value = p,
@@ -412,6 +443,10 @@ class AppState extends ChangeNotifier {
     }
     _scanner = null;
     notifyListeners();
+    // Update finished: the UI offers a quick test.
+    if (kind == JobKind.update && jobError == null && !scanner.cancelled) {
+      updateDone.value++;
+    }
   }
 
   /// Stops the running job. Results so far are kept.
@@ -435,8 +470,68 @@ class AppState extends ChangeNotifier {
     unawaited(_prefs?.setString('lastChannel', c.url));
     lastCountry = c.countryCode;
     unawaited(_prefs?.setString('lastCountry', c.countryCode));
-    await player.open(Media(c.url, httpHeaders: c.httpHeaders));
+    var url = c.url;
+    if (isYouTubeUrl(url)) {
+      // YouTube: look up the live stream address first.
+      ytResolving = true;
+      notifyListeners();
+      try {
+        url = await YouTubeResolver.resolve(c.url);
+      } catch (e) {
+        ytResolving = false;
+        if (currentIndex == index) {
+          await player.stop();
+          playError = e.toString().replaceFirst('Exception: ', '');
+        }
+        notifyListeners();
+        return;
+      }
+      ytResolving = false;
+      if (currentIndex != index) return; // zapped on meanwhile
+      notifyListeners();
+    }
+    await player.open(Media(url,
+        httpHeaders: isYouTubeUrl(c.url) ? const {} : c.httpHeaders));
     await player.setVolume(muted ? 0 : volume);
+  }
+
+  // ================= Own feeds (--own--) =================
+
+  static Channel _ownChannel(String name, String url) => Channel(
+        name: name,
+        countryCode: kOwnCountry,
+        url: url.trim(),
+        source: 'own',
+      );
+
+  void _saveOwn() {
+    _prefs?.setString(
+        'ownFeeds',
+        jsonEncode([
+          for (final c in ownFeeds) {'n': c.name, 'u': c.url},
+        ]));
+    final playing = current;
+    _setDb(ChannelDb(
+        channels: channels,
+        countryNames: countryNames,
+        updated: listUpdated ?? DateTime.now()));
+    currentIndex = playing == null ? -1 : indexOfUrl(playing.url);
+    notifyListeners();
+  }
+
+  void addOwnFeed(String name, String url) {
+    ownFeeds.add(_ownChannel(name.trim().isEmpty ? url : name, url));
+    _saveOwn();
+  }
+
+  void updateOwnFeed(int i, String name, String url) {
+    ownFeeds[i] = _ownChannel(name.trim().isEmpty ? url : name, url);
+    _saveOwn();
+  }
+
+  void removeOwnFeed(int i) {
+    ownFeeds.removeAt(i);
+    _saveOwn();
   }
 
   Future<void> playChannel(Channel c) => play(indexOfUrl(c.url));
@@ -584,7 +679,7 @@ class AppState extends ChangeNotifier {
     }
 
     return const JsonEncoder.withIndent('  ').convert({
-      'app': 'SurfTV',
+      'app': 'SlaxxTV',
       'type': 'favorites',
       'version': 1,
       'exported': DateTime.now().toIso8601String(),
@@ -600,8 +695,10 @@ class AppState extends ChangeNotifier {
   /// added to My Channels. Throws [FormatException] for a wrong file.
   Future<int> importFavorites(String text) async {
     final j = jsonDecode(text);
-    if (j is! Map || j['app'] != 'SurfTV' || j['type'] != 'favorites') {
-      throw const FormatException('This is not a SurfTV favorites file.');
+    if (j is! Map ||
+        !(j['app'] == 'SlaxxTV' || j['app'] == 'SurfTV') ||
+        j['type'] != 'favorites') {
+      throw const FormatException('This is not a SlaxxTV favorites file.');
     }
     final my = [
       for (final e in (j['myChannels'] as List? ?? const []))
@@ -701,6 +798,8 @@ class AppState extends ChangeNotifier {
     }
     final list = set.toList()
       ..sort((a, b) {
+        if (a == kOwnCountry) return -1;
+        if (b == kOwnCountry) return 1;
         if (a == 'XX') return 1;
         if (b == 'XX') return -1;
         return countryName(a).compareTo(countryName(b));
@@ -751,6 +850,7 @@ class AppState extends ChangeNotifier {
     _clock?.cancel();
     _epgDebounce?.cancel();
     jobProgress.dispose();
+    updateDone.dispose();
     for (final s in _subs) {
       s.cancel();
     }

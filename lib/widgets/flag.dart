@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models.dart';
+
 /// Country flag as an image (emoji flags do not work on Windows).
 /// Flags are loaded from flagcdn.com and cached by Flutter.
 class FlagIcon extends StatelessWidget {
@@ -11,6 +13,17 @@ class FlagIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final h = width * 0.7;
+    // Own feeds: small SlaxxTV logo. YouTube: YouTube symbol.
+    if (code == kOwnCountry || code == kYouTubeCountry) {
+      return SizedBox(
+        width: width,
+        height: h,
+        child: Image.asset(
+          code == kOwnCountry ? 'assets/own.png' : 'assets/youtube.png',
+          fit: BoxFit.contain,
+        ),
+      );
+    }
     if (code.isEmpty || code == 'XX') {
       return SizedBox(
         width: width,

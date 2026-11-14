@@ -1,7 +1,7 @@
 name: surftv
-description: "SurfTV - watch free-to-air internet TV channels from all over the world. Written by IT-Dummkopfen with the help of an AI."
+description: "SlaxxTV - watch free-to-air internet TV channels from all over the world. Written by IT-Dummkopfen with the help of an AI."
 publish_to: 'none'
-version: 0.6.0+6
+version: 0.7.0+7
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
@@ -31,6 +31,8 @@ flutter:
     - assets/icon/icon.png
     - assets/channels_default.json
     - assets/tv_background.jpg
+    - assets/own.png
+    - assets/youtube.png
 
 # App icon: a TV with a surfboard gliding on a wave.
 # Generate with:  dart run flutter_launcher_icons

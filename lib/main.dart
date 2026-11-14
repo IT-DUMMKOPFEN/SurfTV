@@ -1,4 +1,4 @@
-// SurfTV - free internet TV from all over the world.
+// SlaxxTV - free internet TV from all over the world.
 // Written by IT-Dummkopfen with the help of an AI.
 
 import 'dart:ui' show PointerDeviceKind;
@@ -29,7 +29,7 @@ Future<void> main() async {
       size: Size(1400, 820),
       minimumSize: Size(640, 420),
       center: true,
-      title: 'SurfTV',
+      title: 'SlaxxTV',
     );
     await windowManager.waitUntilReadyToShow(options, () async {
       await windowManager.show();
@@ -60,7 +60,7 @@ class SurfTvApp extends StatelessWidget {
     return ListenableBuilder(
       listenable: state,
       builder: (context, _) => MaterialApp(
-        title: 'SurfTV',
+        title: 'SlaxxTV',
         debugShowCheckedModeBanner: false,
         theme: _theme(Brightness.light),
         darkTheme: _theme(Brightness.dark),
@@ -89,7 +89,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final _focus = FocusNode(debugLabel: 'SurfTV keys');
+  final _focus = FocusNode(debugLabel: 'SlaxxTV keys');
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   AppState get s => widget.state;
@@ -106,6 +106,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onHardwareKey);
+    s.updateDone.removeListener(_askQuickTest);
     _focus.dispose();
     super.dispose();
   }
@@ -189,10 +190,45 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onHardwareKey);
+    s.updateDone.addListener(_askQuickTest);
     // Show the info window when the app starts.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _about();
     });
+  }
+
+  /// After an update: offer a quick test to remove channels that do not work.
+  Future<void> _askQuickTest() async {
+    if (!mounted) return;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.fact_check_outlined),
+          SizedBox(width: 10),
+          Text('Channel list updated'),
+        ]),
+        content: Text(
+            'The complete list was read in: ${s.channels.length} channels.\n\n'
+            'Run a quick test now? Channels that do not answer are removed '
+            '(own feeds, YouTube channels and My Channels stay). '
+            'You can keep watching TV meanwhile.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Later')),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            icon: const Icon(Icons.bolt),
+            label: const Text('Quick test'),
+          ),
+        ],
+      ),
+    );
+    if (yes == true && mounted) {
+      s.startJob(JobKind.test, TestMode.quick);
+      showJobProgress(context, s).then((_) => _focus.requestFocus());
+    }
   }
 
   /// Update link in the info window: start the update right away.
@@ -269,7 +305,7 @@ class _HomePageState extends State<HomePage> {
           key: _scaffoldKey,
           backgroundColor: Colors.black,
           appBar: AppBar(
-            title: const Text('SurfTV'),
+            title: const Text('SlaxxTV'),
             toolbarHeight: portrait ? kToolbarHeight : 40,
             leading: IconButton(
               tooltip: 'Channels',

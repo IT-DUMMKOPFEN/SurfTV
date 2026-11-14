@@ -295,7 +295,7 @@ Future<void> exportFavoritesFile(BuildContext context, AppState s) async {
   try {
     final path = await FilePicker.platform.saveFile(
       dialogTitle: 'Export favorites',
-      fileName: 'surftv-favorites.json',
+      fileName: 'slaxxtv-favorites.json',
       bytes: bytes,
     );
     if (path == null) return;

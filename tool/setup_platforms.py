@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-SurfTV - one-time platform setup.
+SlaxxTV - one-time platform setup.
 
 Creates the Windows / Linux / macOS / Android project folders with
 `flutter create` and patches them for streaming:
-  * Android: internet permission + plain-HTTP streams allowed, name "SurfTV"
-  * macOS:   network client entitlement, name "SurfTV"
-  * Windows / Linux: window title "SurfTV"
+  * Android: internet permission + plain-HTTP streams allowed, name "SlaxxTV"
+  * macOS:   network client entitlement, name "SlaxxTV"
+  * Windows / Linux: window title "SlaxxTV"
 
 Run from the project folder:   python3 tool/setup_platforms.py
 (On Windows: py tool\\setup_platforms.py)
@@ -28,7 +28,7 @@ def run_flutter_create():
         [flutter, "create", "--project-name", "surftv", "--org", "de.itdummkopfen",
          "--platforms", "windows,linux,macos,android", "."],
         cwd=ROOT, check=True, shell=(sys.platform == "win32"))
-    # flutter create adds a demo test that does not fit SurfTV.
+    # flutter create adds a demo test that does not fit SlaxxTV.
     demo_test = ROOT / "test" / "widget_test.dart"
     if demo_test.exists():
         demo_test.unlink()
@@ -54,7 +54,7 @@ def android_manifest(t):
                       '<uses-permission android:name="android.permission.INTERNET"/>\n    <application', 1)
     if "usesCleartextTraffic" not in t:
         t = t.replace("<application", '<application\n        android:usesCleartextTraffic="true"', 1)
-    t = re.sub(r'android:label="[^"]*"', 'android:label="SurfTV"', t, count=1)
+    t = re.sub(r'android:label="[^"]*"', 'android:label="SlaxxTV"', t, count=1)
     return t
 
 
@@ -71,11 +71,16 @@ def mac_entitlements(t):
 
 def title(t):
     # Windows uses L"surftv", Linux uses "surftv" - both end with "surftv".
-    return t.replace('"surftv"', '"SurfTV"')
+    return t.replace('"surftv"', '"SlaxxTV"').replace('"SurfTV"', '"SlaxxTV"')
+
+
+def binary_name(t):
+    # surftv.exe -> slaxxtv.exe
+    return t.replace('set(BINARY_NAME "surftv")', 'set(BINARY_NAME "slaxxtv")')
 
 
 def mac_name(t):
-    return re.sub(r"PRODUCT_NAME = .*", "PRODUCT_NAME = SurfTV", t)
+    return re.sub(r"PRODUCT_NAME = .*", "PRODUCT_NAME = SlaxxTV", t)
 
 
 def main():
@@ -87,6 +92,8 @@ def main():
     patch("macos/Runner/Release.entitlements", mac_entitlements)
     patch("macos/Runner/Configs/AppInfo.xcconfig", mac_name)
     patch("windows/runner/main.cpp", title)
+    patch("windows/CMakeLists.txt", binary_name)
+    patch("linux/CMakeLists.txt", binary_name)
     patch("linux/runner/my_application.cc", title)
     patch("linux/my_application.cc", title)
     print("\nDone. Now run:  flutter pub get   and then   flutter run")

@@ -50,7 +50,7 @@ class RemoteControl extends StatelessWidget {
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Row(children: [
-            Text('SurfTV',
+            Text('SlaxxTV',
                 style: TextStyle(
                     fontWeight: FontWeight.w800,
                     letterSpacing: 2,
@@ -194,7 +194,7 @@ class RemoteControl extends StatelessWidget {
               icon: const Icon(Icons.help_outline, size: 20),
             ),
             IconButton(
-              tooltip: 'About SurfTV',
+              tooltip: 'About SlaxxTV',
               onPressed: onAbout,
               icon: const Icon(Icons.info_outline, size: 20),
             ),

@@ -5,7 +5,7 @@ import '../models.dart';
 import 'epg_view.dart';
 import 'flag.dart';
 
-const appVersion = '0.6b';
+const appVersion = '0.7b';
 
 /// Info window (also shown when the app starts).
 /// [onUpdate] shows an "Update channel list" link at the bottom left.
@@ -23,7 +23,7 @@ Future<void> showInfo(BuildContext context, {VoidCallback? onUpdate}) {
                   Image.asset('assets/icon/icon.png', width: 110, height: 110),
             ),
             const SizedBox(height: 12),
-            Text('SurfTV', style: Theme.of(ctx).textTheme.headlineSmall),
+            Text('SlaxxTV', style: Theme.of(ctx).textTheme.headlineSmall),
             Text('Version $appVersion',
                 style: Theme.of(ctx).textTheme.bodySmall),
             const SizedBox(height: 10),
@@ -32,8 +32,8 @@ Future<void> showInfo(BuildContext context, {VoidCallback? onUpdate}) {
             const SizedBox(height: 14),
             const Text(
               'Free internet TV from all over the world.\n\n'
-              'Channel lists: iptv-org (github.com/iptv-org/iptv) and '
-              'Free-TV (github.com/Free-TV/IPTV). SurfTV only plays streams '
+              'Channel lists: iptv-org, Free-TV, Famelack and the FreetuxTV '
+              'database. SlaxxTV only plays streams '
               'that are publicly available on the internet. The "VPN" hint '
               'means the broadcaster probably limits the stream to its own '
               'country.',
@@ -59,7 +59,7 @@ Future<void> showInfo(BuildContext context, {VoidCallback? onUpdate}) {
           TextButton(
             onPressed: () => showLicensePage(
               context: ctx,
-              applicationName: 'SurfTV',
+              applicationName: 'SlaxxTV',
               applicationVersion: appVersion,
             ),
             child: const Text('Licenses'),
@@ -103,7 +103,7 @@ Future<void> showHelp(BuildContext context) {
       title: const Row(children: [
         Icon(Icons.help_outline),
         SizedBox(width: 10),
-        Text('SurfTV Help'),
+        Text('SlaxxTV Help'),
       ]),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
@@ -112,7 +112,7 @@ Future<void> showHelp(BuildContext context) {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              p('SurfTV plays free internet TV channels from all over the '
+              p('SlaxxTV plays free internet TV channels from all over the '
                   'world. Channels are sorted by country.'),
               h('Two interfaces'),
               p('Classic: channel list left, TV in the middle, remote '
@@ -138,6 +138,11 @@ Future<void> showHelp(BuildContext context) {
                   'another device.'),
               p('Categories: Movies, Series, Docu, News and Music - pick a '
                   'category, then a country, then a channel.'),
+              p('Live YT: YouTube live channels (from Famelack and Free-TV). '
+                  'In Classic they are in the list under "YouTube".'),
+              p('--own--: your own stream addresses, always on top of the '
+                  'list. Add, edit or delete them in the settings or with the '
+                  'edit button next to --own--.'),
               p('Magnifier: search channels by name. Gear: settings. '
                   'Arrow on the left: channel list. Arrow on the right: '
                   'remote control.'),
@@ -150,6 +155,8 @@ Future<void> showHelp(BuildContext context) {
                   'geo-blocked. You need a VPN into the country of the '
                   'channel. Use the filter All / No VPN / VPN only.'),
               h('Update and Test'),
+              p('Channel sources: iptv-org, Free-TV, Famelack and the '
+                  'FreetuxTV database (WebTV, status working).'),
               p('Update downloads the newest channel lists and builds the '
                   'complete channel list again (all channels, not tested). '
                   'Test checks the channels in your list and removes streams '
@@ -264,6 +271,12 @@ Future<void> showSettings(
                   },
                 ),
                 const Divider(),
+                ListTile(
+                  leading: Image.asset('assets/own.png', width: 24),
+                  title: const Text('--own-- feeds'),
+                  subtitle: Text('${state.ownFeeds.length} own stream addresses'),
+                  onTap: () => showOwnFeeds(ctx, state),
+                ),
                 ListTile(
                   leading: const Icon(Icons.event_note),
                   title: const Text('Program guide (My Channels)'),
@@ -390,6 +403,171 @@ class _NameSearchState extends State<_NameSearch> {
                       ),
           ),
         ]),
+      ),
+    );
+  }
+}
+
+/// --own--: the user's own stream addresses.
+Future<void> showOwnFeeds(BuildContext context, AppState state) {
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => _OwnFeeds(state: state),
+  );
+}
+
+class _OwnFeeds extends StatefulWidget {
+  const _OwnFeeds({required this.state});
+  final AppState state;
+
+  @override
+  State<_OwnFeeds> createState() => _OwnFeedsState();
+}
+
+class _OwnFeedsState extends State<_OwnFeeds> {
+  final _name = TextEditingController();
+  final _url = TextEditingController();
+  int? _editing;
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _url.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final url = _url.text.trim();
+    final ok = RegExp(r'^(https?|rtmp|rtsp|mms|udp)://', caseSensitive: false)
+        .hasMatch(url);
+    if (!ok) {
+      setState(() => _error = 'Please enter a stream address (http://... or https://...).');
+      return;
+    }
+    final s = widget.state;
+    if (_editing == null) {
+      s.addOwnFeed(_name.text, url);
+    } else {
+      s.updateOwnFeed(_editing!, _name.text, url);
+    }
+    setState(() {
+      _editing = null;
+      _error = null;
+      _name.clear();
+      _url.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.state;
+    return ListenableBuilder(
+      listenable: s,
+      builder: (context, _) => AlertDialog(
+        title: Row(children: [
+          Image.asset('assets/own.png', width: 28, height: 28),
+          const SizedBox(width: 10),
+          const Text('--own-- feeds'),
+        ]),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Your own stream addresses. They are always on top '
+                    'of the channel list and stay after every update.'),
+                const SizedBox(height: 10),
+                if (s.ownFeeds.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text('No own feeds yet.'),
+                  ),
+                for (var i = 0; i < s.ownFeeds.length; i++)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Image.asset('assets/own.png', width: 26),
+                    title: Text(s.ownFeeds[i].name,
+                        overflow: TextOverflow.ellipsis),
+                    subtitle: Text(s.ownFeeds[i].url,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      IconButton(
+                        tooltip: 'Watch',
+                        icon: const Icon(Icons.play_arrow),
+                        onPressed: () => s.playChannel(s.ownFeeds[i]),
+                      ),
+                      IconButton(
+                        tooltip: 'Edit',
+                        icon: const Icon(Icons.edit),
+                        onPressed: () => setState(() {
+                          _editing = i;
+                          _name.text = s.ownFeeds[i].name;
+                          _url.text = s.ownFeeds[i].url;
+                        }),
+                      ),
+                      IconButton(
+                        tooltip: 'Delete',
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => s.removeOwnFeed(i),
+                      ),
+                    ]),
+                  ),
+                const Divider(),
+                Text(_editing == null ? 'Add a feed' : 'Edit feed',
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _name,
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _url,
+                  decoration: InputDecoration(
+                    labelText: 'Stream address (m3u8, mp4, ...)',
+                    hintText: 'https://.../master.m3u8',
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    errorText: _error,
+                  ),
+                  onSubmitted: (_) => _save(),
+                ),
+                const SizedBox(height: 8),
+                Row(children: [
+                  FilledButton.icon(
+                    onPressed: _save,
+                    icon: Icon(_editing == null ? Icons.add : Icons.save),
+                    label: Text(_editing == null ? 'Add' : 'Save'),
+                  ),
+                  if (_editing != null) ...[
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () => setState(() {
+                        _editing = null;
+                        _name.clear();
+                        _url.clear();
+                      }),
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                ]),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }

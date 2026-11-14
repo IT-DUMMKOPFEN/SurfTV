@@ -78,7 +78,7 @@ class _TvScreenState extends State<TvScreen> {
                     fill: Colors.black,
                   ),
                   if (c == null || !s.firstFrameSeen) _startPicture(s),
-                  if (c != null && s.buffering && s.playError == null)
+                  if (c != null && (s.buffering || s.ytResolving) && s.playError == null)
                     const Center(
                         child: CircularProgressIndicator(color: Colors.white70)),
                   if (c != null && s.playError != null) _error(s),
@@ -125,7 +125,7 @@ class _TvScreenState extends State<TvScreen> {
     );
   }
 
-  /// Start picture (SurfTV logo, 16:9) until the first video picture.
+  /// Start picture (SlaxxTV logo, 16:9) until the first video picture.
   Widget _startPicture(AppState s) => LayoutBuilder(
         builder: (context, box) => Stack(fit: StackFit.expand, children: [
           Image.asset('assets/tv_background.jpg', fit: BoxFit.cover),

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Builds the channel list that ships with SurfTV (assets/channels_default.json),
+Builds the channel list that ships with SlaxxTV (assets/channels_default.json),
 so the app has channels on the very first start.
 
 Same logic as the in-app channel search (lib/channel_scanner.dart):
@@ -12,6 +12,7 @@ Used by GitHub Actions before building the apps.
 import concurrent.futures as cf
 import datetime
 import json
+from html import unescape
 import pathlib
 import re
 import sys
@@ -20,7 +21,7 @@ import urllib.parse
 import urllib.request
 
 API = "https://iptv-org.github.io/api"
-# Categories SurfTV shows as filters.
+# Categories SlaxxTV shows as filters.
 CATS = {"movies", "series", "documentary", "news", "music"}
 FREE_TV = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -100,16 +101,95 @@ def free_tv():
             continue
         url, inf, info = line, info, None
         low = url.lower()
-        if any(x in low for x in ("youtube.com", "youtu.be", "twitch.tv", "dailymotion.com")):
+        if any(x in low for x in ("twitch.tv", "dailymotion.com")):
             continue
+        youtube = is_youtube(url)
         q = inf.rfind('",')
         name = inf[q + 2:] if q >= 0 else inf[inf.rfind(",") + 1:]
         geo, sd = "Ⓖ" in name, "Ⓢ" in name
         name = re.sub("[ⓎⓉⒹⓈⒼ]", "", name).strip() or attr(inf, "tvg-name") or "Unknown"
         country = (attr(inf, "tvg-country") or "").upper()
-        out.append({"n": name, "c": country if len(country) == 2 else "XX", "u": url,
+        vid = yt_id(url) if youtube else None
+        out.append({"n": name, "c": "YT" if youtube else (country if len(country) == 2 else "XX"), "u": url,
                     "i": attr(inf, "tvg-id"),
+                    "l": f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg" if vid else None,
                     "q": "SD" if sd else None, "g": geo, "s": "Free-TV"})
+    return out
+
+
+def is_youtube(url):
+    u = url.lower()
+    return "youtube.com/" in u or "youtube-nocookie.com/" in u or "youtu.be/" in u
+
+
+def yt_id(url):
+    m = re.search(r"(?:youtu\.be/|/embed/|/live/|/shorts/|[?&]v=)([A-Za-z0-9_-]{11})", url)
+    return m.group(1) if m else None
+
+
+FAMELACK = "https://raw.githubusercontent.com/famelack/famelack-channels/main/tv/categories"
+
+
+def famelack():
+    """Famelack (ex tv.garden): first stream per channel, YouTube lives as country YT."""
+    allc = json.loads(get(f"{FAMELACK}/all.json"))
+    cat_of = {}
+    for cat in CATS:
+        try:
+            for e in json.loads(get(f"{FAMELACK}/{cat}.json")):
+                cat_of.setdefault(e.get("nanoid"), set()).add(cat)
+        except Exception as e:
+            print(f"famelack {cat} failed: {e}")
+    out = []
+    for m in allc:
+        name = (m.get("name") or "Unknown").strip()
+        cc = (m.get("country") or "").upper()
+        cc = "UK" if cc == "GB" else cc
+        cc = cc if len(cc) == 2 else "XX"
+        src = m.get("sources") or {}
+        cats = sorted(cat_of.get(m.get("nanoid"), set()))
+        streams = [s for s in (src.get("streams") or []) if isinstance(s, str)]
+        if streams:
+            out.append({"n": name, "c": cc, "u": streams[0], "g": bool(m.get("isGeoBlocked")),
+                        "s": "Famelack", "k": cats})
+        yts = [s for s in (src.get("youtube") or []) if isinstance(s, str)]
+        if yts:
+            vid = yt_id(yts[0])
+            out.append({"n": name, "c": "YT", "u": yts[0], "s": "Famelack", "k": cats,
+                        "l": f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg" if vid else None})
+    return out
+
+
+def freetuxtv():
+    """FreetuxTV database: WebTV with status Working, all result pages."""
+    out = []
+    td_re = re.compile(r"<td[^>]*>(.*?)</td>", re.S)
+    for page in range(1, 61):
+        url = ("https://database.freetuxtv.net/WebStream/index"
+               "?WebStreamSearchForm%5BType%5D=1&WebStreamSearchForm%5BStatus%5D=2"
+               + (f"&WebStream_page={page}" if page > 1 else ""))
+        html = get(url)
+        rows = []
+        for row in re.split(r"<tr[\s>]", html)[1:]:
+            tds = td_re.findall(row)
+            if len(tds) < 3:
+                continue
+            first = tds[0]
+            hrefs = [unescape(h) for h in re.findall(r'href="((?:https?|rtmp|rtsp|mms)://[^"]+)"', first)
+                     if "freetuxtv.net" not in h]
+            if not hrefs:
+                continue
+            name = re.sub(r"<[^>]*>", "", re.split(r"<br\s*/?>|=&gt;|=>", first)[0])
+            name = unescape(name).strip() or hrefs[0]
+            m = re.search(r'alt="([^"]*)"', tds[2])
+            cc = (m.group(1) if m else "").strip().upper()
+            cc = "UK" if cc == "GB" else cc
+            rows.append({"n": name, "c": cc if len(cc) == 2 else "XX", "u": hrefs[0], "s": "FreetuxTV"})
+        if page == 1 and rows:
+            print("freetuxtv sample:", rows[:3])
+        out += rows
+        if not rows or f"WebStream_page={page + 1}" not in html:
+            break
     return out
 
 
@@ -148,6 +228,8 @@ def dedupe(chans):
 def check(ch):
     """'ok', 'vpn' or 'dead' - same rules as the app."""
     url = ch["u"]
+    if is_youtube(url):
+        return "ok"   # YouTube live channels are not tested
     if not url.lower().startswith(("http://", "https://")):
         return "ok"
     headers = {"User-Agent": ch.get("a") or UA}
@@ -165,7 +247,8 @@ def check(ch):
 
 def main():
     countries, seen, cands = {}, set(), []
-    for name, fn in (("iptv-org", lambda: iptv_org(countries)), ("Free-TV", free_tv)):
+    for name, fn in (("iptv-org", lambda: iptv_org(countries)), ("Free-TV", free_tv),
+                     ("Famelack", famelack), ("FreetuxTV", freetuxtv)):
         try:
             items = fn()
         except Exception as e:  # keep going with the other source

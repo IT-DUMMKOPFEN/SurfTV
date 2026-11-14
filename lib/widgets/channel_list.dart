@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../channel_scanner.dart';
 import '../models.dart';
+import 'dialogs.dart';
 import 'flag.dart';
 import 'scan_dialog.dart';
 
@@ -291,6 +292,14 @@ class _ChannelListState extends State<ChannelList> {
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleSmall),
           ),
+          if (g.code == kOwnCountry)
+            IconButton(
+              tooltip: 'Edit own feeds',
+              visualDensity: VisualDensity.compact,
+              iconSize: 18,
+              icon: const Icon(Icons.edit),
+              onPressed: () => showOwnFeeds(context, widget.state),
+            ),
           Text('${g.channels.length}', style: theme.textTheme.bodySmall),
           Icon(open ? Icons.expand_less : Icons.expand_more, size: 20),
         ]),

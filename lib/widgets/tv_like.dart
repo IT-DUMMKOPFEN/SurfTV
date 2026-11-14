@@ -13,7 +13,12 @@ import 'tv_screen.dart';
 
 /// Tabs of the TV like interface.
 class TvTab {
-  static const live = 0, search = 1, discover = 2, my = 3, categories = 4;
+  static const live = 0,
+      search = 1,
+      discover = 2,
+      my = 3,
+      categories = 4,
+      youtube = 5;
 }
 
 /// "TV like" interface - looks and feels like a modern smart TV.
@@ -115,6 +120,8 @@ class _TvLikeScreenState extends State<TvLikeScreen> {
         return _MyChannelsPage(state: s);
       case TvTab.categories:
         return _CategoriesPage(state: s);
+      case TvTab.youtube:
+        return _LiveYtPage(state: s);
       default:
         return _LivePage(state: s);
     }
@@ -134,6 +141,7 @@ class _TopBar extends StatelessWidget {
     ('Update', TvTab.search),
     ('Discover', TvTab.discover),
     ('Live TV', TvTab.live),
+    ('Live YT', TvTab.youtube),
     ('My Channels', TvTab.my),
     ('Categories', TvTab.categories),
   ];
@@ -156,7 +164,7 @@ class _TopBar extends StatelessWidget {
                   fontSize: narrow ? 24 : 32, fontWeight: FontWeight.w900),
               children: [
                 TextSpan(
-                    text: 'Surf',
+                    text: 'Slaxx',
                     style: TextStyle(
                         color: dark ? Colors.white : Colors.black87)),
                 const TextSpan(text: 'TV', style: TextStyle(color: kAccent)),
@@ -504,7 +512,7 @@ class _Hero extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            c?.name.toUpperCase() ?? 'SURFTV',
+            c?.name.toUpperCase() ?? 'SLAXXTV',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.displaySmall?.copyWith(
@@ -787,7 +795,18 @@ class _DiscoverPage extends StatelessWidget {
         countries: countries,
         selected: country,
       ),
-      _title(context, s.countryName(country), sub: '${list.length} channels'),
+      Row(children: [
+        _title(context, s.countryName(country), sub: '${list.length} channels'),
+        if (country == kOwnCountry)
+          Padding(
+            padding: const EdgeInsets.only(top: 18),
+            child: TextButton.icon(
+              onPressed: () => showOwnFeeds(context, s),
+              icon: const Icon(Icons.edit),
+              label: const Text('Edit own feeds'),
+            ),
+          ),
+      ]),
     ], (shrink) => TileGrid(
           shrink: shrink,
           itemCount: list.length,
@@ -830,6 +849,39 @@ class _CountryRow extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+// =====================================================================
+// Live YT: YouTube live channels
+// =====================================================================
+
+class _LiveYtPage extends StatelessWidget {
+  const _LiveYtPage({required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = state;
+    final list = s.channelsOf(kYouTubeCountry);
+    return _pageLayout([
+      _Hero(state: s),
+      Row(children: [
+        _title(context, 'YouTube Live', sub: '${list.length} channels'),
+        Padding(
+          padding: const EdgeInsets.only(top: 18, left: 4),
+          child: Image.asset('assets/youtube.png', height: 22),
+        ),
+      ]),
+      if (list.isEmpty)
+        _hint(context,
+            'No YouTube channels yet. Use "Update" to read in the channel lists.'),
+    ], (shrink) => TileGrid(
+          shrink: shrink,
+          itemCount: list.length,
+          centerIndex: list.indexWhere((c) => c.url == s.current?.url),
+          itemBuilder: (_, i) => ChannelTile(state: s, channel: list[i]),
+        ));
   }
 }
 

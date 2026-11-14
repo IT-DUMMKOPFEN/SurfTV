@@ -1,5 +1,27 @@
-/// Data models for SurfTV.
+/// Data models for SlaxxTV.
 library;
+
+/// Country code of the user's own feeds (--own--).
+const kOwnCountry = 'OWN';
+
+/// Country code of YouTube live channels.
+const kYouTubeCountry = 'YT';
+
+/// True for YouTube links (watch, embed, live, channel pages).
+bool isYouTubeUrl(String url) {
+  final u = url.toLowerCase();
+  return u.contains('youtube.com/') ||
+      u.contains('youtube-nocookie.com/') ||
+      u.contains('youtu.be/');
+}
+
+/// Video id from a YouTube link, or null (e.g. for channel pages).
+String? youTubeVideoId(String url) {
+  final m = RegExp(
+          r'(?:youtu\.be/|/embed/|/live/|/shorts/|[?&]v=)([A-Za-z0-9_-]{11})')
+      .firstMatch(url);
+  return m?.group(1);
+}
 
 /// One playable TV stream.
 class Channel {

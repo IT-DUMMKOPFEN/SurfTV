@@ -1,11 +1,11 @@
-# SurfTV 0.6b
+# SlaxxTV 0.7b
 
 Watch free-to-air internet TV channels from all over the world.
 Windows · Linux · macOS · Android
 
 *Written by IT-Dummkopfen with the help of an AI.*
 
-<img src="assets/icon/icon.png" width="128" alt="SurfTV icon">
+<img src="assets/icon/icon.png" width="128" alt="SlaxxTV icon">
 
 ## Download
 
@@ -13,10 +13,10 @@ Ready-to-run builds are on the [Releases page](https://github.com/IT-DUMMKOPFEN/
 
 | System | File |
 |---|---|
-| Windows | `SurfTV-windows-x64.zip` – unzip, start `surftv.exe` |
-| macOS | `SurfTV-macos.zip` – not signed: right-click › Open the first time |
-| Linux | `SurfTV-linux-x64.tar.gz` – needs libmpv (`sudo apt install libmpv2`) |
-| Android | `SurfTV-android.apk` – allow installing from unknown sources |
+| Windows | `SlaxxTV-windows-x64.zip` – unzip, start `slaxxtv.exe` |
+| macOS | `SlaxxTV-macos.zip` – not signed: right-click › Open the first time |
+| Linux | `SlaxxTV-linux-x64.tar.gz` – needs libmpv (`sudo apt install libmpv2`) |
+| Android | `SlaxxTV-android.apk` – allow installing from unknown sources |
 
 Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 
@@ -68,7 +68,12 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 ## Channel sources
 
 - iptv-org – https://github.com/iptv-org/iptv (JSON API, includes the "Geo-blocked" label)
-- Free-TV – https://github.com/Free-TV/IPTV (YouTube/Twitch/Dailymotion entries are skipped)
+- Free-TV – https://github.com/Free-TV/IPTV (YouTube live channels marked Ⓨ are listed under YouTube)
+- Famelack (ex tv.garden) – https://github.com/famelack/famelack-channels (incl. many 24/7 YouTube live streams)
+- FreetuxTV database – https://database.freetuxtv.net (WebTV, status "Working")
+
+YouTube channels are listed as country **YouTube** (Classic) and on the **Live YT** page (TV like).
+**--own--** holds your own stream addresses and is always on top of the list.
 
 The channel list is saved in the app support folder (`channels.json`).
 Settings and the keys 0–9 are saved with shared_preferences.

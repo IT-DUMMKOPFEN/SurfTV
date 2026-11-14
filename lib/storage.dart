@@ -39,6 +39,11 @@ class Storage {
   }
 
   static Future<void> saveDb(ChannelDb db) async {
+    // Own feeds are kept in the settings, not in the channel list.
+    db = ChannelDb(
+        channels: db.channels.where((c) => c.source != 'own').toList(),
+        countryNames: db.countryNames,
+        updated: db.updated);
     final f = await _file();
     final text = jsonEncode(db.toJson());
     final tmp = File('${f.path}.tmp');

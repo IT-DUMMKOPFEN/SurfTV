@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Starts SurfTV in an Android emulator, takes screenshots and prints them
+# Starts SlaxxTV in an Android emulator, takes screenshots and prints them
 # as base64 (between SHOT markers) plus the app log. Used by CI.
 # Note: the CI emulator does not pass key events (F1 etc.) to the app
 # reliably, so everything is done with taps.
