@@ -10,9 +10,13 @@ import 'flag.dart';
 /// Always a 16:9 screen - 4:3 channels are shown centered with black bars,
 /// just like on a real TV.
 class TvScreen extends StatefulWidget {
-  const TvScreen({super.key, required this.state});
+  const TvScreen({super.key, required this.state, this.compact = false});
 
   final AppState state;
+
+  /// Small preview (Discover / Categories): no channel banner, no
+  /// fullscreen button, short error.
+  final bool compact;
 
   @override
   State<TvScreen> createState() => _TvScreenState();
@@ -84,15 +88,20 @@ class _TvScreenState extends State<TvScreen> {
                     Center(
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                         const CircularProgressIndicator(color: Colors.white70),
-                        if (s.playStatus != null) ...[
+                        if (s.playStatus != null && !widget.compact) ...[
                           const SizedBox(height: 10),
                           Text(s.playStatus!,
                               style: const TextStyle(color: Colors.white70)),
                         ],
                       ]),
                     ),
-                  if (c != null && s.playError != null) _error(s),
-                  if (c != null)
+                  if (c != null && s.playError != null)
+                    widget.compact
+                        ? const Center(
+                            child: Icon(Icons.signal_wifi_bad,
+                                color: Colors.white70))
+                        : _error(s),
+                  if (c != null && !widget.compact)
                     Positioned(
                       left: 16,
                       top: 16,
@@ -102,6 +111,7 @@ class _TvScreenState extends State<TvScreen> {
                         child: _osdBox(s),
                       ),
                     ),
+                  if (!widget.compact)
                   Positioned(
                     right: 12,
                     bottom: 12,

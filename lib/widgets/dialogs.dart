@@ -5,7 +5,7 @@ import '../models.dart';
 import 'epg_view.dart';
 import 'flag.dart';
 
-const appVersion = '0.9b';
+const appVersion = '1.0';
 
 /// Info window (also shown when the app starts).
 /// [onUpdate] shows an "Update channel list" link at the bottom left.
@@ -145,7 +145,9 @@ Future<void> showHelp(BuildContext context) {
                   'your channels. After every update, channels with the same '
                   'stream address are removed automatically (clean up). '
                   'Channels in My Channels and on the keys 0-9 always stay.'),
-              p('Discover: pick a country, then a channel.'),
+              p('Discover: pick a country, then a channel. The + on a channel '
+                  'adds it to My Channels. The small picture at the top right '
+                  'is the running channel - tap it to watch.'),
               p('My Channels: your favorites. Sort them with drag & drop '
                   'in the "Sort" view. Remove with the x. Switch to '
                   '"Program guide" to see what is on - the guide is loaded '

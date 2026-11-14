@@ -14,6 +14,7 @@ class ChannelTile extends StatefulWidget {
     required this.channel,
     this.onTap,
     this.onRemove,
+    this.showFavorite = false,
   });
 
   final AppState state;
@@ -22,6 +23,10 @@ class ChannelTile extends StatefulWidget {
 
   /// Shows a small "remove" button (My Channels).
   final VoidCallback? onRemove;
+
+  /// Shows a small "+" button to add the channel to My Channels
+  /// (Discover, Categories).
+  final bool showFavorite;
 
   @override
   State<ChannelTile> createState() => _ChannelTileState();
@@ -115,6 +120,12 @@ class _ChannelTileState extends State<ChannelTile> {
               ),
               if (c.needsVpn)
                 const Positioned(right: 6, bottom: 6, child: VpnBadge()),
+              if (widget.showFavorite)
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: _FavButton(state: s, channel: c),
+                ),
               if (widget.onRemove != null)
                 Positioned(
                   right: 0,
@@ -128,6 +139,46 @@ class _ChannelTileState extends State<ChannelTile> {
                   ),
                 ),
             ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small round "+" / "✓" button: add to / remove from My Channels.
+class _FavButton extends StatelessWidget {
+  const _FavButton({required this.state, required this.channel});
+  final AppState state;
+  final Channel channel;
+
+  @override
+  Widget build(BuildContext context) {
+    final inMy = state.isMyChannel(channel);
+    return Tooltip(
+      message: inMy
+          ? 'In My Channels - tap to remove'
+          : 'Add to My Channels',
+      child: Material(
+        color: inMy ? kAccent : Colors.black54,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () {
+            state.toggleMyChannel(channel);
+            ScaffoldMessenger.maybeOf(context)
+              ?..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(
+                duration: const Duration(seconds: 2),
+                content: Text(state.isMyChannel(channel)
+                    ? '"${channel.name}" added to My Channels'
+                    : '"${channel.name}" removed from My Channels'),
+              ));
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Icon(inMy ? Icons.check : Icons.add,
+                size: 18, color: Colors.white),
           ),
         ),
       ),

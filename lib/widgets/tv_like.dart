@@ -790,14 +790,16 @@ class _DiscoverPage extends StatelessWidget {
     final s = state;
     final countries = s.countriesWith();
     if (countries.isEmpty) {
-      return _hint(context, 'No channels yet. Open "Search" to update the list.');
+      return _hint(context, 'No channels yet. Open "Update" to read in the list.');
     }
     final country = countries.contains(s.lastCountry)
         ? s.lastCountry!
         : countries.first;
     final list = s.channelsOf(country);
     return _pageLayout([
-      _title(context, 'Discover', sub: '${countries.length} countries'),
+      _withMiniTv(context, s,
+          _title(context, 'Discover', sub: '${countries.length} countries'),
+          width: 128),
       _CountryRow(
         state: s,
         countries: countries,
@@ -819,9 +821,41 @@ class _DiscoverPage extends StatelessWidget {
           shrink: shrink,
           itemCount: list.length,
           centerIndex: list.indexWhere((c) => c.url == s.current?.url),
-          itemBuilder: (_, i) => ChannelTile(state: s, channel: list[i]),
+          itemBuilder: (_, i) =>
+              ChannelTile(state: s, channel: list[i], showFavorite: true),
         ));
   }
+}
+
+/// Header with the running TV picture at the top right
+/// (Discover, Categories). Tap = Watch Live.
+Widget _withMiniTv(BuildContext context, AppState s, Widget header,
+    {required double width}) {
+  // No room on small phones.
+  if (MediaQuery.sizeOf(context).width < 600) return header;
+  return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Expanded(child: header),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 36, 0),
+      child: Tooltip(
+        message: s.current == null ? 'No channel' : 'Watch Live',
+        child: GestureDetector(
+          onTap: s.current == null ? null : () => s.setWatchLive(true),
+          child: Container(
+            width: width,
+            height: width * 9 / 16,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kAccent, width: 2),
+            ),
+            child: TvScreen(state: s, compact: true),
+          ),
+        ),
+      ),
+    ),
+  ]);
 }
 
 /// Swipeable row of country tiles; the selected country is in the middle.
@@ -1040,19 +1074,26 @@ class _CategoriesPage extends StatelessWidget {
         country == null ? <Channel>[] : s.channelsOf(country, category: cat);
 
     final header = <Widget>[
-      _title(context, 'Categories'),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
-        child: Wrap(spacing: 12, runSpacing: 10, children: [
-          for (final k in kCategories)
-            ChoiceChip(
-              avatar: Icon(_categoryIcons[k]),
-              label: Text(_categoryNames[k]!,
-                  style: const TextStyle(fontSize: 17)),
-              selected: k == cat,
-              onSelected: (_) => s.setTvCategory(k),
-            ),
+      _withMiniTv(
+        context,
+        s,
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _title(context, 'Categories'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
+            child: Wrap(spacing: 12, runSpacing: 10, children: [
+              for (final k in kCategories)
+                ChoiceChip(
+                  avatar: Icon(_categoryIcons[k]),
+                  label: Text(_categoryNames[k]!,
+                      style: const TextStyle(fontSize: 17)),
+                  selected: k == cat,
+                  onSelected: (_) => s.setTvCategory(k),
+                ),
+            ]),
+          ),
         ]),
+        width: 176,
       ),
     ];
     if (country == null) {
@@ -1074,7 +1115,8 @@ class _CategoriesPage extends StatelessWidget {
           shrink: shrink,
           itemCount: list.length,
           centerIndex: list.indexWhere((c) => c.url == s.current?.url),
-          itemBuilder: (_, i) => ChannelTile(state: s, channel: list[i]),
+          itemBuilder: (_, i) =>
+              ChannelTile(state: s, channel: list[i], showFavorite: true),
         ));
   }
 }
