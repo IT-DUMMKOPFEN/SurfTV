@@ -5,8 +5,17 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 def get(u):
     r = urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": UA}), timeout=30)
     return r.geturl(), r.read().decode("utf-8", "replace")
-streams = json.loads(get("https://iptv-org.github.io/api/streams.json")[1])
-pl = [s["url"] for s in streams if "pluto" in (s.get("url") or "")]
+pl = []
+for s in json.loads(get("https://iptv-org.github.io/api/streams.json")[1]):
+    if "pluto" in (s.get("url") or "").lower() or "pluto" in (s.get("title") or "").lower():
+        pl.append(s["url"])
+m3u = get("https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8")[1]
+pl += [l.strip() for l in m3u.splitlines() if "pluto" in l.lower() and not l.startswith("#")]
+for c in json.loads(get("https://raw.githubusercontent.com/famelack/famelack-channels/main/tv/categories/all.json")[1]):
+    for s in (c.get("sources") or {}).get("streams") or []:
+        if "pluto" in s.lower() or "pluto" in (c.get("name") or "").lower():
+            pl.append(s)
+print("sample urls:", pl[:6])
 print("pluto streams in iptv-org:", len(pl))
 for u in pl[:3]:
     print("\n=== ", u[:140])
