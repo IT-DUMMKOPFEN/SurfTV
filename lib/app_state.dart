@@ -18,6 +18,27 @@ import 'stream_proxy.dart';
 /// Channel list filter for geo-blocked channels.
 enum VpnFilter { all, noVpn, vpnOnly }
 
+/// One selectable video quality (HLS variant / video track).
+class VideoQuality {
+  const VideoQuality(this.id, this.height, this.bitrate);
+  final int id;
+  final int height;
+  final int bitrate;
+
+  /// Key to remember the choice per channel.
+  String get key => height > 0 ? 'h$height' : 'b$bitrate';
+
+  String get label {
+    final mb = bitrate > 0 ? '${(bitrate / 1000000).toStringAsFixed(1)} Mbit/s' : '';
+    if (height > 0) return mb.isEmpty ? '${height}p' : '${height}p  ($mb)';
+    return mb.isEmpty ? 'Track $id' : mb;
+  }
+
+  String get short => height > 0
+      ? '${height}p'
+      : (bitrate > 0 ? '${(bitrate / 1000000).toStringAsFixed(1)}M' : '#$id');
+}
+
 /// The two user interfaces.
 enum UiMode { classic, tvLike }
 
@@ -31,6 +52,11 @@ class AppState extends ChangeNotifier {
   AppState() {
     video = VideoController(player);
     _configurePlayer();
+    // Pluto & co: restart cleanly after a break (ad / logo clip).
+    _subs.add(StreamProxy.instance.onBreak.listen((_) => _onStreamBreak()));
+    // Video tracks (qualities) of the running stream.
+    _subs.add(player.stream.tracks.listen((_) => _refreshQualities()));
+    _stallTimer = Timer.periodic(const Duration(seconds: 2), (_) => _checkStall());
     _subs.addAll([
       player.stream.buffering.listen((b) {
         buffering = b;
@@ -213,6 +239,11 @@ class AppState extends ChangeNotifier {
           (p.getString('theme') == 'light') ? ThemeMode.light : ThemeMode.dark;
       _compatUrls.addAll(p.getStringList('compatUrls') ?? const []);
       bufferEnabled = p.getBool('bufferEnabled') ?? true;
+      stallDetection = p.getBool('stallDetection') ?? false;
+      final qp = p.getString('qualities');
+      if (qp != null) {
+        _qualityPrefs = (jsonDecode(qp) as Map).cast<String, String>();
+      }
       bufferSeconds = p.getInt('bufferSeconds') ?? 5;
       final own = p.getString('ownFeeds');
       ownFeeds = own == null
@@ -563,6 +594,7 @@ class AppState extends ChangeNotifier {
     if (_shutDown) return;
     _shutDown = true;
     _watchdog?.cancel();
+    _stallTimer?.cancel();
     _scanner?.cancel();
     for (final s in _subs) {
       await s.cancel();
@@ -576,6 +608,126 @@ class AppState extends ChangeNotifier {
 
   /// Shown under the spinner, e.g. "Compatibility mode...".
   String? playStatus;
+
+  /// Pluto TV: separate audio/video playlists and stitched-in ads and logo
+  /// clips (breaks). Always played in compatibility mode with a clean
+  /// restart after every break.
+  static bool isPluto(Channel c) {
+    final u = c.url.toLowerCase();
+    return u.contains('pluto.tv') ||
+        u.contains('plutotv') ||
+        u.contains('jmp2.uk/plu-');
+  }
+
+  DateTime _lastBreakRestart = DateTime.fromMillisecondsSinceEpoch(0);
+
+  void _onStreamBreak() {
+    final c = current;
+    if (c == null || !_usingCompat || !isPluto(c) || _shutDown) return;
+    final now = DateTime.now();
+    if (now.difference(_lastBreakRestart).inSeconds < 12) return;
+    _lastBreakRestart = now;
+    unawaited(_open(c, compat: true, quiet: true));
+  }
+
+  // ---- Stall detection (setting, off by default) ----
+  bool stallDetection = false;
+  Timer? _stallTimer;
+  Duration _lastPos = Duration.zero;
+  DateTime _lastProgress = DateTime.now();
+
+  void setStallDetection(bool v) {
+    stallDetection = v;
+    _prefs?.setBool('stallDetection', v);
+    _lastProgress = DateTime.now();
+    notifyListeners();
+  }
+
+  /// Picture stands still for 10 s (also endless buffering): restart.
+  void _checkStall() {
+    final c = current;
+    if (!stallDetection || c == null || _shutDown || !firstFrameSeen) return;
+    if ((videoWidth ?? 0) == 0 && playError != null) return;
+    final pos = player.state.position;
+    final now = DateTime.now();
+    if (pos != _lastPos) {
+      _lastPos = pos;
+      _lastProgress = now;
+      return;
+    }
+    if (now.difference(_lastProgress).inSeconds >= 10) {
+      _lastProgress = now;
+      playStatus = 'Stream stalled - restarting...';
+      notifyListeners();
+      unawaited(_open(c, compat: _usingCompat, quiet: false, status: playStatus));
+    }
+  }
+
+  // ---- Quality (video tracks / HLS variants) per stream ----
+
+  /// Selectable qualities of the running stream (empty = only one).
+  List<VideoQuality> qualities = [];
+
+  /// Selected quality (null = automatic).
+  VideoQuality? quality;
+  Map<String, String> _qualityPrefs = {};
+  bool _qualityApplied = false;
+
+  Future<void> _refreshQualities() async {
+    try {
+      final raw = await (player.platform as dynamic).getProperty('track-list');
+      final list = jsonDecode(raw as String) as List;
+      final q = <VideoQuality>[];
+      int? selected;
+      for (final t in list) {
+        final m = t as Map;
+        if (m['type'] != 'video' || m['albumart'] == true) continue;
+        final id = (m['id'] as num).toInt();
+        final h = (m['demux-h'] as num?)?.toInt() ?? 0;
+        final br = ((m['hls-bitrate'] ?? m['demux-bitrate']) as num?)?.toInt() ?? 0;
+        q.add(VideoQuality(id, h, br));
+        if (m['selected'] == true) selected = id;
+      }
+      q.sort((a, b) =>
+          b.height != a.height ? b.height.compareTo(a.height) : b.bitrate.compareTo(a.bitrate));
+      qualities = q.length > 1 ? q : [];
+      final c = current;
+      // Apply the quality saved for this channel once.
+      if (c != null && !_qualityApplied && qualities.isNotEmpty) {
+        _qualityApplied = true;
+        final pref = _qualityPrefs[c.url];
+        final want = pref == null
+            ? null
+            : qualities.where((x) => x.key == pref).firstOrNull;
+        if (want != null) {
+          quality = want;
+          await _setProp('vid', '${want.id}');
+          notifyListeners();
+          return;
+        }
+      }
+      if (quality != null && selected != null && quality!.id != selected) {
+        quality = qualities.where((x) => x.id == selected).firstOrNull;
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// [q] null = automatic (best quality the connection allows).
+  Future<void> selectQuality(VideoQuality? q) async {
+    final c = current;
+    quality = q;
+    await _setProp('vid', q == null ? 'auto' : '${q.id}');
+    if (c != null) {
+      if (q == null) {
+        _qualityPrefs.remove(c.url);
+      } else {
+        _qualityPrefs[c.url] = q.key;
+      }
+      _prefs?.setString('qualities', jsonEncode(_qualityPrefs));
+    }
+    notifyListeners();
+  }
 
   bool _canCompat(Channel c) {
     final u = c.url.toLowerCase();
@@ -592,11 +744,22 @@ class AppState extends ChangeNotifier {
     return true;
   }
 
-  Future<void> _open(Channel c, {required bool compat}) async {
+  Future<void> _open(Channel c,
+      {required bool compat, bool quiet = false, String? status}) async {
     _usingCompat = compat;
-    playStatus = compat ? 'Compatibility mode...' : null;
+    playStatus = status ?? (compat && !quiet && !isPluto(c) ? 'Compatibility mode...' : null);
     playError = null;
+    _lastProgress = DateTime.now();
+    if (!quiet) {
+      qualities = [];
+      quality = null;
+      _qualityApplied = false;
+    } else {
+      _qualityApplied = false; // re-apply the chosen quality after restart
+    }
     notifyListeners();
+    // Smooth timestamps over breaks (ads, logo clips).
+    await _setProp('demuxer-lavf-linearize-timestamps', isPluto(c) ? 'yes' : 'auto');
     final ua =
         (c.userAgent?.isNotEmpty ?? false) ? c.userAgent! : browserUserAgent;
     if (compat) {
@@ -632,8 +795,9 @@ class AppState extends ChangeNotifier {
     unawaited(_prefs?.setString('lastChannel', c.url));
     lastCountry = c.countryCode;
     unawaited(_prefs?.setString('lastCountry', c.countryCode));
-    // Channels known to need it start in compatibility mode right away.
-    await _open(c, compat: _compatUrls.contains(c.url) && _canCompat(c));
+    // Channels known to need it (and Pluto) start in compatibility mode.
+    await _open(c,
+        compat: (_compatUrls.contains(c.url) || isPluto(c)) && _canCompat(c));
   }
 
   // ================= Own feeds (--own--) =================
@@ -989,6 +1153,7 @@ class AppState extends ChangeNotifier {
   void dispose() {
     _scanner?.cancel();
     _watchdog?.cancel();
+    _stallTimer?.cancel();
     _clock?.cancel();
     _epgDebounce?.cancel();
     jobProgress.dispose();

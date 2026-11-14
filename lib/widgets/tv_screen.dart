@@ -28,6 +28,21 @@ class _TvScreenState extends State<TvScreen> {
   int _lastIndex = -2;
   bool _hover = false;
 
+  /// Buttons (quality, fullscreen) - hidden after a few seconds in
+  /// fullscreen and Watch Live, shown again when the mouse moves.
+  bool _controls = true;
+  Timer? _hideTimer;
+  bool _wasVideoOnly = false;
+
+  void _poke() {
+    if (!mounted) return;
+    if (!_controls) setState(() => _controls = true);
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && widget.state.videoOnly) setState(() => _controls = false);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -39,10 +54,20 @@ class _TvScreenState extends State<TvScreen> {
   void dispose() {
     widget.state.removeListener(_onState);
     _osdTimer?.cancel();
+    _hideTimer?.cancel();
     super.dispose();
   }
 
   void _onState() {
+    final vo = widget.state.videoOnly;
+    if (vo != _wasVideoOnly) {
+      _wasVideoOnly = vo;
+      if (vo) {
+        _poke();
+      } else if (!_controls) {
+        setState(() => _controls = true);
+      }
+    }
     final i = widget.state.currentIndex;
     if (i != _lastIndex) {
       _lastIndex = i;
@@ -61,14 +86,26 @@ class _TvScreenState extends State<TvScreen> {
     final s = widget.state;
     final c = s.current;
 
-    return ColoredBox(
+    final showControls = !s.videoOnly || _controls;
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() => _hover = true);
+        _poke();
+      },
+      onHover: (_) => _poke(),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: s.videoOnly && !_controls
+          ? SystemMouseCursors.none
+          : MouseCursor.defer,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: _poke, // touch: show the buttons again
+        child: ColoredBox(
       color: Colors.black,
       child: Center(
         child: AspectRatio(
           aspectRatio: 16 / 9,
           child: MouseRegion(
-            onEnter: (_) => setState(() => _hover = true),
-            onExit: (_) => setState(() => _hover = false),
             child: GestureDetector(
               onDoubleTap: () =>
                   s.videoOnly ? s.exitVideoOnly() : s.toggleFullscreen(),
@@ -117,34 +154,47 @@ class _TvScreenState extends State<TvScreen> {
                       ),
                     ),
                   if (!widget.compact)
-                  Positioned(
-                    right: 12,
-                    bottom: 12,
-                    child: AnimatedOpacity(
-                      opacity: _hover ? 1 : 0.45,
-                      duration: const Duration(milliseconds: 200),
-                      child: Material(
-                        color: Colors.black54,
-                        shape: const CircleBorder(),
-                        child: IconButton(
-                          tooltip: s.videoOnly
-                              ? 'Back (Esc)'
-                              : 'Fullscreen (F)',
-                          color: Colors.white,
-                          icon: Icon(s.videoOnly
-                              ? Icons.fullscreen_exit
-                              : Icons.fullscreen),
-                          onPressed: () => s.videoOnly
-                              ? s.exitVideoOnly()
-                              : s.toggleFullscreen(),
+                    Positioned(
+                      right: 12,
+                      bottom: 12,
+                      child: IgnorePointer(
+                        ignoring: !showControls,
+                        child: AnimatedOpacity(
+                          opacity: !showControls
+                              ? 0
+                              : (_hover || s.videoOnly ? 1 : 0.45),
+                          duration: const Duration(milliseconds: 250),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            if (s.qualities.isNotEmpty) ...[
+                              _QualityButton(state: s, onOpen: _poke),
+                              const SizedBox(width: 8),
+                            ],
+                            Material(
+                              color: Colors.black54,
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                tooltip: s.videoOnly
+                                    ? 'Back (Esc)'
+                                    : 'Fullscreen (F)',
+                                color: Colors.white,
+                                icon: Icon(s.videoOnly
+                                    ? Icons.fullscreen_exit
+                                    : Icons.fullscreen),
+                                onPressed: () => s.videoOnly
+                                    ? s.exitVideoOnly()
+                                    : s.toggleFullscreen(),
+                              ),
+                            ),
+                          ]),
                         ),
                       ),
                     ),
-                  ),
                 ]),
               ),
             ),
           ),
+        ),
+      ),
         ),
       ),
     );
@@ -277,6 +327,56 @@ class _TvScreenState extends State<TvScreen> {
               ],
             ]),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+
+/// Quality button (bottom right, next to fullscreen): shows the qualities
+/// of the running stream.
+class _QualityButton extends StatelessWidget {
+  const _QualityButton({required this.state, required this.onOpen});
+  final AppState state;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = state;
+    final label = s.quality?.short ?? 'Auto';
+    return Material(
+      color: Colors.black54,
+      shape: const StadiumBorder(),
+      child: PopupMenuButton<int>(
+        tooltip: 'Quality',
+        onOpened: onOpen,
+        position: PopupMenuPosition.over,
+        onSelected: (id) => s.selectQuality(
+            id < 0 ? null : s.qualities.firstWhere((q) => q.id == id)),
+        itemBuilder: (_) => [
+          CheckedPopupMenuItem<int>(
+            value: -1,
+            checked: s.quality == null,
+            child: const Text('Auto'),
+          ),
+          const PopupMenuDivider(),
+          for (final q in s.qualities)
+            CheckedPopupMenuItem<int>(
+              value: q.id,
+              checked: s.quality?.id == q.id,
+              child: Text(q.label),
+            ),
+        ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.high_quality, color: Colors.white, size: 20),
+            const SizedBox(width: 6),
+            Text(label,
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+          ]),
         ),
       ),
     );

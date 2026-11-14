@@ -28,6 +28,39 @@ class StreamProxy {
   /// Cookies per host (also those set on redirects).
   final Map<String, Map<String, String>> _cookies = {};
 
+  /// Fires when a break (#EXT-X-DISCONTINUITY, e.g. an ad break or a
+  /// stitched-in logo clip) has passed in a live HLS playlist.
+  final StreamController<void> _breaks = StreamController<void>.broadcast();
+  Stream<void> get onBreak => _breaks.stream;
+
+  /// Per media playlist: number of breaks that are well inside the window.
+  final Map<String, int> _passedBreaks = {};
+
+  void _checkBreaks(String body, Uri uri) {
+    if (!body.contains('#EXTINF')) return; // master playlist
+    var seq = 0;
+    var tags = 0;
+    var segsAfterLast = 0;
+    for (final l in const LineSplitter().convert(body)) {
+      final t = l.trim();
+      if (t.startsWith('#EXT-X-DISCONTINUITY-SEQUENCE:')) {
+        seq = int.tryParse(t.substring(30)) ?? 0;
+      } else if (t == '#EXT-X-DISCONTINUITY') {
+        tags++;
+        segsAfterLast = 0;
+      } else if (t.isNotEmpty && !t.startsWith('#')) {
+        segsAfterLast++;
+      }
+    }
+    // A break counts once at least 3 segments follow it - a restart then
+    // begins behind the break.
+    final passed = seq + (tags == 0 ? 0 : (segsAfterLast >= 3 ? tags : tags - 1));
+    final key = '${uri.host}${uri.path}';
+    final prev = _passedBreaks[key];
+    _passedBreaks[key] = prev == null || passed > prev ? passed : prev;
+    if (prev != null && passed > prev) _breaks.add(null);
+  }
+
   /// Address for the player that plays [target] through the proxy.
   Future<String> url(String target, {String? referer, String? userAgent}) async {
     await _start();
@@ -80,9 +113,9 @@ class StreamProxy {
         res.headers.contentType =
             ContentType('application', 'vnd.apple.mpegurl', charset: 'utf-8');
         res.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
-        res.write(body.trimLeft().startsWith('#EXTM3U')
-            ? _rewrite(body, finalUri, referer, ua)
-            : body);
+        final isM3u = body.trimLeft().startsWith('#EXTM3U');
+        if (isM3u) _checkBreaks(body, finalUri);
+        res.write(isM3u ? _rewrite(body, finalUri, referer, ua) : body);
         await res.close();
         return;
       }

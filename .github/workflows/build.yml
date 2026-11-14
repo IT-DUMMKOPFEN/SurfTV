@@ -42,9 +42,14 @@ jobs:
           - name: Linux
             os: ubuntu-latest
             target: linux
-          - name: macOS
+          - name: macOS-Silicon
             os: macos-latest
             target: macos
+            mac: Silicon
+          - name: macOS-Intel
+            os: macos-15-intel
+            target: macos
+            mac: intel
           - name: Android
             os: ubuntu-latest
             target: apk
@@ -108,13 +113,21 @@ jobs:
         run: |
           mkdir -p dist
           APP=$(ls -d build/macos/Build/Products/Release/*.app | head -n1)
-          ditto -c -k --sequesterRsrc --keepParent "$APP" dist/SlaxxTV-macos.zip
+          echo "Architectures:"
+          lipo -archs "$APP/Contents/MacOS/"* || true
+          find "$APP/Contents/Frameworks" -maxdepth 3 -type f -perm +111 | head -5 | while read f; do echo "$f: $(lipo -archs "$f" 2>/dev/null)"; done
+          ditto -c -k --sequesterRsrc --keepParent "$APP" dist/SlaxxTV-macOS-${{ matrix.mac }}.zip
 
       - name: Package (Android)
         if: matrix.target == 'apk'
         run: |
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk dist/SlaxxTV-android.apk
+          # Smaller APKs per processor type (e.g. 32-bit TV boxes with Android 10)
+          flutter build apk --release --split-per-abi
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk dist/SlaxxTV-android-arm32.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk dist/SlaxxTV-android-arm64.apk
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk dist/SlaxxTV-android-x86_64.apk
 
       - uses: actions/upload-artifact@v4
         with:
@@ -144,7 +157,13 @@ jobs:
 
             Downloads:
             - Windows: SlaxxTV-windows-x64.zip (unzip, start slaxxtv.exe)
-            - macOS: SlaxxTV-macos.zip (unsigned: right-click > Open the first time)
+            - macOS Apple Silicon (M1/M2/...): SlaxxTV-macOS-Silicon.zip
+            - macOS Intel: SlaxxTV-macOS-intel.zip
+              (both unsigned: right-click > Open the first time)
             - Linux: SlaxxTV-linux-x64.tar.gz (needs libmpv: sudo apt install libmpv2)
-            - Android: SlaxxTV-android.apk
+            - Android (all devices): SlaxxTV-android.apk
+            - Android, smaller per processor type:
+              SlaxxTV-android-arm32.apk (older phones, many TV boxes, Android 10),
+              SlaxxTV-android-arm64.apk (most current phones),
+              SlaxxTV-android-x86_64.apk (emulators, some boxes)
           files: dist/*

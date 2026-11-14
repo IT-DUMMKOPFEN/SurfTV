@@ -14,9 +14,10 @@ Ready-to-run builds are on the [Releases page](https://github.com/IT-DUMMKOPFEN/
 | System | File |
 |---|---|
 | Windows | `SlaxxTV-windows-x64.zip` – unzip, start `slaxxtv.exe` |
-| macOS | `SlaxxTV-macos.zip` – not signed: right-click › Open the first time |
+| macOS Apple Silicon | `SlaxxTV-macOS-Silicon.zip` – not signed: right-click › Open the first time |
+| macOS Intel | `SlaxxTV-macOS-intel.zip` – not signed: right-click › Open the first time |
 | Linux | `SlaxxTV-linux-x64.tar.gz` – needs libmpv (`sudo apt install libmpv2`) |
-| Android | `SlaxxTV-android.apk` – allow installing from unknown sources |
+| Android | `SlaxxTV-android.apk` (all devices) or the smaller `SlaxxTV-android-arm32.apk` (older phones, TV boxes, Android 10), `-arm64.apk`, `-x86_64.apk` – allow installing from unknown sources |
 
 Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 
@@ -33,6 +34,9 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 - Settings, English help and info page
 - **Program guide** for the channels in My Channels (now / next on Live TV, tiles, remote display; full guide on the My Channels page or with **G**). Source: [epgshare01](https://epgshare01.online/epgshare01/) – not every channel has guide data
 - **+ button** on channel tiles in Discover and Categories adds a channel to My Channels; the running picture is shown small at the top right
+- **Quality button** next to the fullscreen button: pick the quality of the running stream (remembered per channel); buttons hide after a few seconds in fullscreen / Watch Live
+- **Stall detection** (settings, off by default): restarts a stream whose picture stands still
+- **Pluto TV:** played in compatibility mode with a clean restart after each ad / logo break (no stutter afterwards)
 - **Buffering:** a few seconds are loaded ahead ("Buffering" in the picture) for smoother playback; on/off and 3/5/10 s in the settings
 - **Sort My Channels** with drag & drop (mouse or finger)
 - **Export / Import** of My Channels and the keys 0–9 as a JSON file

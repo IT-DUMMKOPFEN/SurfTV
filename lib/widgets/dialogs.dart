@@ -185,6 +185,19 @@ Future<void> showHelp(BuildContext context) {
                   'starts playing ("Buffering" in the picture). This helps '
                   'with streams that have short dropouts. Switch it off or '
                   'change the seconds in the settings.'),
+              h('Quality'),
+              p('The button next to the fullscreen button (bottom right of '
+                  'the picture) shows the qualities of the running stream. '
+                  'Pick one or "Auto". The choice is remembered per channel. '
+                  'Lower quality = fewer dropouts on slow connections.'),
+              h('Stall detection'),
+              p('When switched on in the settings, a stream whose picture '
+                  'stands still for 10 seconds is restarted automatically.'),
+              h('Pluto TV'),
+              p('Pluto TV inserts ads and logo clips into its streams. '
+                  'SlaxxTV plays Pluto channels in compatibility mode and '
+                  'restarts the stream shortly after each such break, so it '
+                  'does not stutter afterwards.'),
               h('Compatibility mode'),
               p('Some streams play in a web browser but not in the player '
                   '(e.g. "tcp: ffurl_read returned ..."). Then SlaxxTV '
@@ -280,6 +293,14 @@ Future<void> showSettings(
                       ),
                     ),
                   ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.restart_alt),
+                  title: const Text('Stall detection'),
+                  subtitle: const Text('Restart the stream when the picture '
+                      'stands still for 10 seconds'),
+                  value: state.stallDetection,
+                  onChanged: state.setStallDetection,
+                ),
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.vpn_lock),
