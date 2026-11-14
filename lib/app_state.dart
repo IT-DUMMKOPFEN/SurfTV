@@ -270,11 +270,17 @@ class AppState extends ChangeNotifier {
     countryNames = db.countryNames;
     listUpdated = db.updated;
     // Clean up: only one channel per stream address.
-    final clean = dedupeChannels(db.channels);
+    // Own feeds are not part of the clean up and win over list entries
+    // with the same address.
+    final ownUrls = {for (final c in ownFeeds) c.url};
+    final clean = dedupeChannels([
+      for (final c in db.channels)
+        if (c.source != 'own' && !ownUrls.contains(c.url)) c,
+    ]);
     _replaced = clean.replaced;
     _remapFavorites();
     final list = <Channel>[
-      ...clean.channels.where((c) => c.source != 'own'),
+      ...clean.channels,
       ...ownFeeds,
     ];
     // --own-- always on top, "International / Unknown" at the end.

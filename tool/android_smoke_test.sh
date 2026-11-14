@@ -42,6 +42,14 @@ shot tv_rows
 adb shell input tap 800 54      # Categories
 sleep 5
 shot tv_categories
+adb shell input tap 582 54      # Live YT
+sleep 5
+shot tv_yt
+adb shell input swipe 640 600 640 200 500
+sleep 3
+adb shell input tap 130 420     # a YouTube channel
+sleep 25
+shot tv_yt_play
 
 # Phone (portrait) - TV like is remembered
 adb shell wm size reset
