@@ -345,10 +345,22 @@ Widget _hint(BuildContext context, String text) => Padding(
 Widget _pageLayout(List<Widget> header, Widget Function(bool shrink) grid) =>
     LayoutBuilder(builder: (context, box) {
       if (box.maxHeight < 700) {
+        final g = grid(true);
+        if (g is TileGrid) {
+          // Lazy: only the visible tiles are built (lists can be long).
+          return CustomScrollView(slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: header),
+            ),
+            g.buildSliver(box.maxWidth),
+          ]);
+        }
         return SingleChildScrollView(
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [...header, grid(true)]),
+              children: [...header, g]),
         );
       }
       return Column(

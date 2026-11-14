@@ -344,6 +344,27 @@ class TileGrid extends StatefulWidget {
   final int? centerIndex;
   final double spacing;
 
+  /// The same grid as a sliver (for pages that scroll as a whole).
+  /// Only the visible tiles are built.
+  Widget buildSliver(double width) {
+    const pad = 24.0;
+    final cols = ((width - 2 * pad + spacing) / (tileWidth + spacing))
+        .floor()
+        .clamp(1, 50);
+    return SliverPadding(
+      padding: const EdgeInsets.all(pad),
+      sliver: SliverGrid(
+        delegate: SliverChildBuilderDelegate(itemBuilder, childCount: itemCount),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: cols,
+          mainAxisExtent: tileHeight,
+          crossAxisSpacing: spacing,
+          mainAxisSpacing: spacing,
+        ),
+      ),
+    );
+  }
+
   @override
   State<TileGrid> createState() => _TileGridState();
 }
