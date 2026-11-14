@@ -1,8 +1,7 @@
 name: Android emulator test
 
 on:
-  push:
-    branches: [ci-android-test]
+  workflow_dispatch:
   workflow_dispatch:
 
 jobs:
