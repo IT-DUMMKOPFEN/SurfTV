@@ -127,10 +127,25 @@ class AppState extends ChangeNotifier {
   String tvCategory = 'movies';
 
   /// TV like, My Channels: show the program guide instead of the tiles.
-  bool myGuide = false;
+  /// TV like, My Channels: 0 = tiles, 1 = program guide, 2 = sort.
+  int myView = 0;
 
-  void setMyGuide(bool v) {
-    myGuide = v;
+  void setMyView(int v) {
+    myView = v;
+    notifyListeners();
+  }
+
+  /// Drag & drop in My Channels: moves the channel at [oldIndex] of
+  /// [myChannelList] to [newIndex] (ReorderableListView indexes).
+  void moveMyChannel(int oldIndex, int newIndex) {
+    final shown = myChannelList.map((c) => c.url).toList();
+    if (oldIndex < 0 || oldIndex >= shown.length) return;
+    if (newIndex > oldIndex) newIndex--;
+    final url = shown.removeAt(oldIndex);
+    shown.insert(newIndex.clamp(0, shown.length), url);
+    // Channels that are not in the list right now keep their place at the end.
+    myChannels = [...shown, ...myChannels.where((u) => !shown.contains(u))];
+    _prefs?.setStringList('myChannels', myChannels);
     notifyListeners();
   }
 

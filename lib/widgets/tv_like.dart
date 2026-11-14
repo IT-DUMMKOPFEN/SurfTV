@@ -880,19 +880,23 @@ class _MyChannelsPage extends StatelessWidget {
         runSpacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          SegmentedButton<bool>(
+          SegmentedButton<int>(
             segments: const [
               ButtonSegment(
-                  value: false,
+                  value: 0,
                   icon: Icon(Icons.grid_view),
                   label: Text('Channels')),
               ButtonSegment(
-                  value: true,
+                  value: 1,
                   icon: Icon(Icons.event_note),
                   label: Text('Program guide')),
+              ButtonSegment(
+                  value: 2,
+                  icon: Icon(Icons.swap_vert),
+                  label: Text('Sort')),
             ],
-            selected: {s.myGuide},
-            onSelectionChanged: (v) => s.setMyGuide(v.first),
+            selected: {s.myView},
+            onSelectionChanged: (v) => s.setMyView(v.first),
           ),
           OutlinedButton.icon(
             onPressed: () => importFavoritesFile(context, s),
@@ -916,7 +920,21 @@ class _MyChannelsPage extends StatelessWidget {
             'No favorites yet. Watch a channel and press "+ Favorite" on Live TV.'),
       ]);
     }
-    if (s.myGuide) {
+    if (s.myView == 2) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _title(context, 'My Channels', sub: '${my.length}'),
+        toolbar,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(28, 10, 28, 0),
+          child: Text(
+              'Drag the channels with the mouse (or hold and drag with your '
+              'finger) to sort your list.',
+              style: Theme.of(context).textTheme.bodyMedium),
+        ),
+        Expanded(child: _SortList(state: s)),
+      ]);
+    }
+    if (s.myView == 1) {
       return _pageLayout([
         _title(context, 'My Channels', sub: '${my.length}'),
         toolbar,
@@ -935,6 +953,70 @@ class _MyChannelsPage extends StatelessWidget {
             onRemove: () => s.toggleMyChannel(my[i]),
           ),
         ));
+  }
+}
+
+/// My Channels as a list that can be sorted with drag & drop.
+class _SortList extends StatelessWidget {
+  const _SortList({required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = state;
+    final my = s.myChannelList;
+    final scheme = Theme.of(context).colorScheme;
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
+      buildDefaultDragHandles: false,
+      itemCount: my.length,
+      onReorder: s.moveMyChannel,
+      itemBuilder: (context, i) {
+        final c = my[i];
+        final playing = s.current?.url == c.url;
+        // Whole row: hold and drag (touch). Handle: drag at once (mouse).
+        return ReorderableDelayedDragStartListener(
+          key: ValueKey(c.url),
+          index: i,
+          child: Card(
+            color: playing ? scheme.primaryContainer : null,
+            child: ListTile(
+              leading: Row(mainAxisSize: MainAxisSize.min, children: [
+                ReorderableDragStartListener(
+                  index: i,
+                  child: const MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: Padding(
+                      padding: EdgeInsets.all(4),
+                      child: Icon(Icons.drag_indicator),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 28,
+                  child: Text('${i + 1}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 12),
+                FlagIcon(c.countryCode, width: 28),
+              ]),
+              title: Text(c.name, overflow: TextOverflow.ellipsis),
+              subtitle: Text(s.countryName(c.countryCode)),
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (c.needsVpn) const VpnBadge(),
+                IconButton(
+                  tooltip: 'Watch',
+                  icon: const Icon(Icons.play_arrow),
+                  onPressed: () => s.playChannel(c),
+                ),
+              ]),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 

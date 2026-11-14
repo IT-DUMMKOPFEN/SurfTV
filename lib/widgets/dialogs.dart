@@ -5,7 +5,7 @@ import '../models.dart';
 import 'epg_view.dart';
 import 'flag.dart';
 
-const appVersion = '0.8b';
+const appVersion = '0.9b';
 
 /// Info window (also shown when the app starts).
 /// [onUpdate] shows an "Update channel list" link at the bottom left.
@@ -38,6 +38,22 @@ Future<void> showInfo(BuildContext context, {VoidCallback? onUpdate}) {
               'means the broadcaster probably limits the stream to its own '
               'country.',
               textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Note: SlaxxTV simply reads external playlists of freely '
+                'available TV channels and has no control over their streams. '
+                'If a channel does not work, it is likely due to geo-blocking '
+                'or technical issues on the broadcaster\'s side.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontStyle: FontStyle.italic),
+              ),
             ),
           ]),
         ),
@@ -130,7 +146,8 @@ Future<void> showHelp(BuildContext context) {
                   'stream address are removed automatically (clean up). '
                   'Channels in My Channels and on the keys 0-9 always stay.'),
               p('Discover: pick a country, then a channel.'),
-              p('My Channels: your favorites. Remove with the x. Switch to '
+              p('My Channels: your favorites. Sort them with drag & drop '
+                  'in the "Sort" view. Remove with the x. Switch to '
                   '"Program guide" to see what is on - the guide is loaded '
                   'for the channels in My Channels only (source: epgshare01, '
                   'not available for every channel). Export / Import saves '
