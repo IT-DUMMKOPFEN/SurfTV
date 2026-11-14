@@ -1,0 +1,31 @@
+name: Stream check (diagnose)
+
+on:
+  push:
+    branches: [ci-stream-check]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install ffmpeg / mpv
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg mpv > /dev/null
+      - name: Check Das Erste
+        run: |
+          URL=https://daserste-live.ard-mcdn.de/daserste/live/hls/de/master.m3u8
+          for UA in "libmpv" "Lavf/60.16.100" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"; do
+            CODE=$(curl -s -o /tmp/m.txt -w "%{http_code}" -A "$UA" "$URL")
+            echo "UA=[$UA] -> HTTP $CODE"
+          done
+          echo "--- curl without user agent"
+          curl -s -o /dev/null -w "%{http_code}\n" -H "User-Agent:" "$URL"
+          echo "--- master playlist (browser UA)"
+          curl -s -A "Mozilla/5.0" "$URL" | head -20
+          echo "--- ffprobe default"
+          timeout 40 ffprobe -v error -show_entries stream=codec_type,width,height -of compact "$URL" 2>&1 | tail -5 || true
+          echo "--- ffprobe browser UA"
+          timeout 40 ffprobe -v error -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" -show_entries stream=codec_type,width,height -of compact "$URL" 2>&1 | tail -5 || true
+          echo "--- mpv default (10 s, no video output)"
+          timeout 25 mpv --no-config --vo=null --ao=null --length=5 --msg-level=all=warn "$URL" 2>&1 | tail -15 || true
+          echo "--- mpv browser UA"
+          timeout 25 mpv --no-config --vo=null --ao=null --length=5 --msg-level=all=warn --user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36" "$URL" 2>&1 | tail -15 || true
