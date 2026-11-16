@@ -240,6 +240,7 @@ class AppState extends ChangeNotifier {
       _compatUrls.addAll(p.getStringList('compatUrls') ?? const []);
       bufferEnabled = p.getBool('bufferEnabled') ?? true;
       stallDetection = p.getBool('stallDetection') ?? false;
+      hardwareDecoding = p.getBool('hardwareDecoding') ?? false;
       final qp = p.getString('qualities');
       if (qp != null) {
         _qualityPrefs = (jsonDecode(qp) as Map).cast<String, String>();
@@ -634,6 +635,28 @@ class AppState extends ChangeNotifier {
     unawaited(_open(c, compat: true, quiet: true));
   }
 
+  // ---- Hardware decoding (setting, off by default) ----
+
+  /// Decode the video with the graphics chip instead of the processor.
+  /// Less load, but some devices / streams show errors or a green picture.
+  bool hardwareDecoding = false;
+
+  String get _hwdecValue => !hardwareDecoding
+      ? 'no'
+      : (Platform.isAndroid ? 'mediacodec-copy' : 'auto-safe');
+
+  Future<void> setHardwareDecoding(bool v) async {
+    hardwareDecoding = v;
+    _prefs?.setBool('hardwareDecoding', v);
+    notifyListeners();
+    await _setProp('hwdec', _hwdecValue);
+    // Takes effect cleanly with a fresh start of the running stream.
+    final c = current;
+    if (c != null && !_shutDown) {
+      unawaited(_open(c, compat: _usingCompat, quiet: true));
+    }
+  }
+
   // ---- Stall detection (setting, off by default) ----
   bool stallDetection = false;
   Timer? _stallTimer;
@@ -766,6 +789,7 @@ class AppState extends ChangeNotifier {
       _qualityApplied = false; // re-apply the chosen quality after restart
     }
     notifyListeners();
+    await _setProp('hwdec', _hwdecValue);
     // Smooth timestamps over breaks (ads, logo clips).
     await _setProp('demuxer-lavf-linearize-timestamps', isPluto(c) ? 'yes' : 'auto');
     final ua =

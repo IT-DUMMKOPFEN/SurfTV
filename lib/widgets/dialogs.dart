@@ -193,6 +193,12 @@ Future<void> showHelp(BuildContext context) {
               h('Stall detection'),
               p('When switched on in the settings, a stream whose picture '
                   'stands still for 10 seconds is restarted automatically.'),
+              h('Hardware decoding'),
+              p('Settings > Hardware decoding (off by default) lets the '
+                  'graphics chip decode the video. This saves power and '
+                  'helps weak devices, but on some devices or streams the '
+                  'picture stays black, turns green or breaks up - then turn '
+                  'it off again.'),
               h('Countries'),
               p('Settings > Countries: click the flags of the countries you '
                   'want to see in Discover and Categories. If none are '
@@ -304,6 +310,15 @@ Future<void> showSettings(
                       'stands still for 10 seconds'),
                   value: state.stallDetection,
                   onChanged: state.setStallDetection,
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.memory),
+                  title: const Text('Hardware decoding'),
+                  subtitle: const Text('Decode the video with the graphics '
+                      'chip - less load, but some devices or streams show '
+                      'errors. Turn it off again if the picture breaks up.'),
+                  value: state.hardwareDecoding,
+                  onChanged: state.setHardwareDecoding,
                 ),
                 const Divider(),
                 ListTile(

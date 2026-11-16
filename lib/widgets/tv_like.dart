@@ -500,9 +500,19 @@ class _Hero extends StatelessWidget {
     final now = c == null ? null : s.nowOn(c);
     final next = c == null ? null : s.nextOn(c);
 
+    // Low screens (phone turned sideways): tighter layout.
+    final dense = MediaQuery.sizeOf(context).height < 560;
+    final gap = dense ? 0.5 : 1.0;
+    final btnPad = EdgeInsets.symmetric(
+        horizontal: dense ? 16 : 22, vertical: dense ? 10 : 18);
+    final btnFont = dense ? 15.0 : 18.0;
+
     final info = Padding(
-      padding: const EdgeInsets.fromLTRB(36, 24, 24, 24),
+      padding: dense
+          ? const EdgeInsets.fromLTRB(20, 10, 16, 10)
+          : const EdgeInsets.fromLTRB(36, 24, 24, 24),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -518,18 +528,21 @@ class _Hero extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     fontSize: 16)),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12 * gap),
           Text(
             c?.name.toUpperCase() ?? 'SLAXXTV',
-            maxLines: 2,
+            maxLines: dense ? 1 : 2,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.displaySmall?.copyWith(
+            style: (dense
+                    ? Theme.of(context).textTheme.headlineSmall
+                    : Theme.of(context).textTheme.displaySmall)
+                ?.copyWith(
                 fontWeight: FontWeight.w900, height: 1.05),
           ),
           if (now != null) ...[
             const SizedBox(height: 8),
             Text(now.title,
-                maxLines: 2,
+                maxLines: dense ? 1 : 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context)
                     .textTheme
@@ -538,7 +551,7 @@ class _Hero extends StatelessWidget {
             Text('${hm(now.start)} – ${hm(now.stop)}',
                 style: Theme.of(context).textTheme.bodyMedium),
           ],
-          const SizedBox(height: 12),
+          SizedBox(height: 12 * gap),
           // Progress of the programme running now (or just a line).
           SizedBox(
             width: 320,
@@ -566,14 +579,14 @@ class _Hero extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium),
             ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14 * gap),
           if (c != null)
             Wrap(
               spacing: 10,
               runSpacing: 6,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                FlagIcon(c.countryCode, width: 34),
+                FlagIcon(c.countryCode, width: dense ? 26 : 34),
                 Text(s.countryName(c.countryCode),
                     style: Theme.of(context).textTheme.titleMedium),
                 for (final k in c.categories)
@@ -590,23 +603,21 @@ class _Hero extends StatelessWidget {
           else
             Text('Pick a channel below or in Discover.',
                 style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 22),
+          SizedBox(height: 22 * gap),
           Wrap(spacing: 14, runSpacing: 10, children: [
             FilledButton.tonalIcon(
               style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
-                  textStyle: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
+                  padding: btnPad,
+                  textStyle: TextStyle(
+                      fontSize: btnFont, fontWeight: FontWeight.bold)),
               onPressed: c == null ? null : () => s.setWatchLive(true),
               icon: const Icon(Icons.play_arrow),
               label: const Text('Watch Live'),
             ),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
-                  textStyle: const TextStyle(fontSize: 18)),
+                  padding: btnPad,
+                  textStyle: TextStyle(fontSize: btnFont)),
               onPressed: c == null ? null : () => s.toggleMyChannel(c),
               icon: Icon(c != null && s.isMyChannel(c)
                   ? Icons.check
@@ -656,7 +667,20 @@ class _Hero extends StatelessWidget {
         height: h,
         color: scheme.surfaceContainerLow,
         child: Row(children: [
-          Expanded(flex: 4, child: info),
+          // The info always fits the height: scaled down if it is taller
+          // (never drawn over the rows below).
+          Expanded(
+            flex: 4,
+            child: LayoutBuilder(
+              builder: (context, b) => ClipRect(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox(width: b.maxWidth, child: info),
+                ),
+              ),
+            ),
+          ),
           Expanded(flex: 6, child: picture),
         ]),
       );

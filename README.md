@@ -53,6 +53,7 @@ Every push to `main` is built by GitHub Actions (see the *Actions* tab).
 - Channel search: downloads the public lists and tests every stream, like the channel search on a TV. It shows a live counter with channel name and country. **Stop** keeps the channels found so far.
 - VPN hint: channels marked *geo-blocked* in the lists, or that answered "access denied" during the search
 - VPN filter: **All / No VPN / VPN only**
+- **Hardware decoding** (settings, off by default): video decoded by the graphics chip
 - **Countries** (settings): click the flags of the countries shown in Discover and Categories – none selected = all
 - Categories: **Movies, Series, Docu, News, Music** – all countries with their channels of that kind
 - **Update** reads in the complete newest channel lists (all channels); **Test** then keeps only the working ones
